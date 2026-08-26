@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: termchat
+      POSTGRES_USER: termchat
+      POSTGRES_PASSWORD: termchat
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - termchat-postgres:/var/lib/postgresql/data
+      - ./migrations/000001_init.up.sql:/docker-entrypoint-initdb.d/000001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U termchat -d termchat"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  termchat-postgres:
