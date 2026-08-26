@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coder/websocket"
+
 	"termchat.local/termchat/internal/domain"
 )
 
@@ -42,6 +44,10 @@ type Client struct {
 
 	mu    sync.RWMutex
 	token string
+
+	connMu  sync.RWMutex
+	conn    *websocket.Conn
+	writeMu sync.Mutex
 }
 
 func New(serverURL string) (*Client, error) {
