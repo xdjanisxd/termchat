@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -27,6 +28,16 @@ const (
 type authResultMsg struct {
 	session client.Session
 	err     error
+}
+
+type sessionRestoreMsg struct {
+	session    client.Session
+	connectErr error
+	loadErr    error
+}
+
+type connectResultMsg struct {
+	err error
 }
 
 type Model struct {
@@ -65,7 +76,16 @@ func NewModel(api *client.Client, sessions client.SessionStore) *Model {
 }
 
 func (m *Model) Init() tea.Cmd {
-	return nil
+	return func() tea.Msg {
+		session, err := m.sessions.Load()
+		if err != nil {
+			return sessionRestoreMsg{loadErr: err}
+		}
+		m.api.SetToken(session.Token)
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		return sessionRestoreMsg{session: session, connectErr: m.api.Connect(ctx)}
+	}
 }
 
 func (m *Model) Screen() Screen {
@@ -86,6 +106,28 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
+	case sessionRestoreMsg:
+		if msg.loadErr != nil {
+			if !errors.Is(msg.loadErr, client.ErrNoSession) {
+				m.status = "Could not load saved session: " + msg.loadErr.Error()
+			}
+			return m, nil
+		}
+		m.session = msg.session
+		m.screen = ScreenHome
+		if msg.connectErr != nil {
+			m.status = "Session loaded, but chat connection failed: " + msg.connectErr.Error()
+		} else {
+			m.status = "Session restored for " + msg.session.User.Username
+		}
+		return m, nil
+	case connectResultMsg:
+		if msg.err != nil && !errors.Is(msg.err, client.ErrAlreadyConnected) {
+			m.status = "Chat connection failed: " + msg.err.Error()
+		} else {
+			m.status = "Connected as " + m.session.User.Username
+		}
+		return m, nil
 	case authResultMsg:
 		m.loading = false
 		if msg.err != nil {
@@ -101,7 +143,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.password.SetValue("")
 		m.status = "Authenticated as " + msg.session.User.Username
 		m.screen = ScreenHome
-		return m, nil
+		return m, m.connectCmd()
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
 			return m, tea.Quit
@@ -195,6 +237,14 @@ func (m *Model) authenticateCmd(register bool, username, password string) tea.Cm
 			session, err = m.api.Login(ctx, username, password)
 		}
 		return authResultMsg{session: session, err: err}
+	}
+}
+
+func (m *Model) connectCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		return connectResultMsg{err: m.api.Connect(ctx)}
 	}
 }
 

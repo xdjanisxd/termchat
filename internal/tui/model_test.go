@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/coder/websocket"
 
 	"termchat.local/termchat/internal/client"
 )
@@ -75,6 +76,52 @@ func TestModelShowsAuthenticationError(t *testing.T) {
 	updateModel(t, model, command())
 	if model.Screen() != ScreenLogin || !strings.Contains(model.Status(), "Invalid username or password") {
 		t.Fatalf("screen=%v status=%q", model.Screen(), model.Status())
+	}
+}
+
+func TestModelRestoresSavedSessionAndConnects(t *testing.T) {
+	t.Parallel()
+
+	connected := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/ws" {
+			http.NotFound(w, r)
+			return
+		}
+		connected <- r.Header.Get("Authorization")
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close(websocket.StatusNormalClosure, "test complete")
+		_, _, _ = conn.Read(r.Context())
+	}))
+	defer server.Close()
+	api, _ := client.New(server.URL)
+	store := client.NewSessionStore(filepath.Join(t.TempDir(), "session.json"))
+	session := client.Session{Token: "saved-token"}
+	session.User.ID = "user-1"
+	session.User.Username = "alice"
+	if err := store.Save(session); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	model := NewModel(api, store)
+	command := model.Init()
+	if command == nil {
+		t.Fatal("Init() did not return a session restore command")
+	}
+	updateModel(t, model, command())
+	defer api.Disconnect()
+	if model.Screen() != ScreenHome || model.Session() != session {
+		t.Fatalf("restored screen=%v session=%#v status=%q", model.Screen(), model.Session(), model.Status())
+	}
+	select {
+	case authorization := <-connected:
+		if authorization != "Bearer saved-token" {
+			t.Fatalf("Authorization = %q", authorization)
+		}
+	default:
+		t.Fatal("saved session did not establish a websocket connection")
 	}
 }
 
