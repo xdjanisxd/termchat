@@ -1,16 +1,21 @@
 package tui
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 
 	"termchat.local/termchat/internal/client"
+	"termchat.local/termchat/internal/domain"
+	"termchat.local/termchat/internal/protocol"
 )
 
 func TestModelRegisterFlowPersistsSession(t *testing.T) {
@@ -122,6 +127,69 @@ func TestModelRestoresSavedSessionAndConnects(t *testing.T) {
 		}
 	default:
 		t.Fatal("saved session did not establish a websocket connection")
+	}
+}
+
+func TestModelJoinUsesMaskedPasswordPromptAndOpensChat(t *testing.T) {
+	t.Parallel()
+
+	received := make(chan protocol.ClientEvent, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close(websocket.StatusNormalClosure, "test complete")
+		var event protocol.ClientEvent
+		if err := wsjson.Read(r.Context(), conn, &event); err != nil {
+			return
+		}
+		received <- event
+		room := domain.PublicRoom{ID: "room-1", Name: "private_room"}
+		_ = wsjson.Write(r.Context(), conn, protocol.ServerEvent{Type: "room_joined", RequestID: event.RequestID, Room: &room})
+		_, _, _ = conn.Read(r.Context())
+	}))
+	defer server.Close()
+	api, _ := client.New(server.URL)
+	api.SetToken("jwt-token")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := api.Connect(ctx); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer api.Disconnect()
+
+	model := NewModel(api, client.NewSessionStore(filepath.Join(t.TempDir(), "session.json")))
+	model.screen = ScreenHome
+	model.session.Token = "jwt-token"
+	model.session.User.ID = "user-1"
+	model.session.User.Username = "alice"
+	updateModel(t, model, keyRunes("/join private_room"))
+	updateModel(t, model, tea.KeyMsg{Type: tea.KeyEnter})
+	if model.Screen() != ScreenRoomPassword {
+		t.Fatalf("screen = %v, want ScreenRoomPassword", model.Screen())
+	}
+	updateModel(t, model, keyRunes("roompass"))
+	if strings.Contains(model.View(), "roompass") {
+		t.Fatal("room password prompt exposed plaintext")
+	}
+	sendCommand := updateModel(t, model, tea.KeyMsg{Type: tea.KeyEnter})
+	if sendCommand == nil {
+		t.Fatal("room password submit did not return a send command")
+	}
+	updateModel(t, model, sendCommand())
+	select {
+	case event := <-received:
+		if event.Type != "join_room" || event.RoomName != "private_room" || event.Password != "roompass" {
+			t.Fatalf("join event = %#v", event)
+		}
+	case <-ctx.Done():
+		t.Fatal("server did not receive join_room event")
+	}
+	listenCommand := model.listenCmd()
+	updateModel(t, model, listenCommand())
+	if model.Screen() != ScreenChat || model.CurrentRoom() == nil || model.CurrentRoom().Name != "private_room" {
+		t.Fatalf("screen=%v room=%#v status=%q", model.Screen(), model.CurrentRoom(), model.Status())
 	}
 }
 
