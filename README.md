@@ -1,14 +1,14 @@
 # TermChat
 
-TermChat, özel odalarda çalışan Windows ve Linux uyumlu bir terminal sohbet uygulamasıdır. Bu repository'yi klonlayan kullanıcılar yalnızca istemciyi derleyerek mevcut TermChat sunucusuna bağlanabilir; istemci kullanımı için Docker veya PostgreSQL gerekmez.
+TermChat is a Windows- and Linux-compatible terminal chat application built around private rooms. Users can clone this repository, build only the client, and connect to an existing TermChat server; Docker and PostgreSQL are not required to use the client.
 
-## Gereksinimler
+## Requirements
 
 - [Git](https://git-scm.com/downloads)
-- [Go 1.27 veya daha yeni](https://go.dev/dl/)
-- İnternet bağlantısı ve modern bir terminal
+- [Go 1.27 or later](https://go.dev/dl/)
+- An internet connection and a modern terminal
 
-Kurulumdan önce Go'yu doğrulayın:
+Verify your Go installation before continuing:
 
 ```text
 go version
@@ -16,7 +16,7 @@ go version
 
 ## Windows
 
-PowerShell açın ve sırasıyla çalıştırın:
+Open PowerShell and run these commands in order:
 
 ```powershell
 git clone https://github.com/xdjanisxd/termchat.git
@@ -29,13 +29,13 @@ curl.exe -fsS "https://termchat.osmanela.com/healthz"
 ./bin/termchat.exe --server "https://termchat.osmanela.com"
 ```
 
-Sağlık kontrolünün beklenen cevabı:
+Expected health check response:
 
 ```json
 {"status":"ok"}
 ```
 
-Sunucu adresini geçerli PowerShell oturumu için kaydetmek isterseniz:
+To set the server address for the current PowerShell session:
 
 ```powershell
 $env:TERMCHAT_SERVER_URL = "https://termchat.osmanela.com"
@@ -44,7 +44,7 @@ $env:TERMCHAT_SERVER_URL = "https://termchat.osmanela.com"
 
 ## Linux
 
-Terminal açın ve sırasıyla çalıştırın:
+Open a terminal and run these commands in order:
 
 ```bash
 git clone https://github.com/xdjanisxd/termchat.git
@@ -58,42 +58,42 @@ curl -fsS "https://termchat.osmanela.com/healthz"
 ./bin/termchat --server "https://termchat.osmanela.com"
 ```
 
-Sağlık kontrolünün beklenen cevabı:
+Expected health check response:
 
 ```json
 {"status":"ok"}
 ```
 
-Sunucu adresini geçerli shell oturumu için kaydetmek isterseniz:
+To set the server address for the current shell session:
 
 ```bash
 export TERMCHAT_SERVER_URL="https://termchat.osmanela.com"
 ./bin/termchat
 ```
 
-## İlk kullanım
+## First Use
 
-İstemci açıldığında yeni bir kullanıcı oluşturun veya mevcut hesabınızla giriş yapın. Temel komutlar:
+When the client opens, register a new user or sign in with an existing account. Basic commands:
 
-| Komut | Açıklama |
+| Command | Description |
 |---|---|
-| `/createroom <oda-adı> <parola>` | Özel oda oluşturur |
-| `/join <oda-adı>` | Maskeli parola ekranıyla odaya katılır |
-| `/who` | Odadaki çevrimiçi kullanıcıları gösterir |
-| `/leave` | Odadan ayrılır |
-| `/quit` | Uygulamayı kapatır |
+| `/createroom <room-name> <password>` | Creates a private room |
+| `/join <room-name>` | Joins a room through a masked password prompt |
+| `/who` | Shows users currently online in the room |
+| `/leave` | Leaves the room |
+| `/quit` | Closes the application |
 
-Sunucu URL'sine `/v1` veya `/v1/ws` eklemeyin; istemci gerekli API ve WebSocket yollarını otomatik oluşturur.
+Do not append `/v1` or `/v1/ws` to the server URL; the client creates the required API and WebSocket paths automatically.
 
-## Sorun giderme
+## Troubleshooting
 
-Sunucuya ulaşılamıyorsa önce şunu kontrol edin:
+If the server cannot be reached, check this endpoint first:
 
 ```text
 https://termchat.osmanela.com/healthz
 ```
 
-Eski veya geçersiz oturumu temizlemek için:
+To clear a stale or invalid session:
 
 **Windows PowerShell**
 
@@ -107,4 +107,4 @@ Remove-Item "$env:APPDATA\termchat\session.json" -Force -ErrorAction SilentlyCon
 rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/termchat/session.json"
 ```
 
-Sunucu tarafını kendi ortamınızda çalıştırmak için [Docker deployment rehberine](deploy/README.md) bakın.
+To run the server in your own environment, see the [Docker deployment guide](deploy/README.md).
