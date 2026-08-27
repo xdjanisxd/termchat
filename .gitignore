@@ -7,6 +7,7 @@ coverage.out
 .env
 .env.*
 !.env.example
+deploy/compose.env
 termchat.toml
 session.json
 

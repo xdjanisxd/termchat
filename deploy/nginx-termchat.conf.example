@@ -1,0 +1,25 @@
+# Place this map once inside Nginx's http context, outside server blocks.
+map $http_upgrade $termchat_connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# Add this location to the HTTPS server block for your TermChat domain.
+# Replace TERMCHAT_LXC_IP with the TermChat LXC's static LAN address.
+location / {
+    proxy_pass http://TERMCHAT_LXC_IP:8080;
+    proxy_http_version 1.1;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Authorization $http_authorization;
+
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $termchat_connection_upgrade;
+
+    proxy_read_timeout 24h;
+    proxy_send_timeout 24h;
+    proxy_buffering off;
+}

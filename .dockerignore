@@ -1,0 +1,15 @@
+.git
+.gitignore
+.hermes
+bin
+dist
+coverage.out
+
+.env
+.env.*
+deploy/compose.env
+
+*.exe
+*.log
+.DS_Store
+Thumbs.db
