@@ -33,7 +33,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ../migrations:/migrations:ro
+      - ./migrations:/migrations:ro
     command:
       - -path=/migrations
       - -database=postgres://${POSTGRES_USER:-termchat}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-termchat}?sslmode=disable
@@ -48,7 +48,7 @@ services:
 
   server:
     build:
-      context: ..
+      context: .
       dockerfile: Dockerfile
     image: ${TERMCHAT_IMAGE:-termchat-server:local}
     restart: unless-stopped
@@ -58,7 +58,7 @@ services:
       migrate:
         condition: service_completed_successfully
     environment:
-      TERMCHAT_LISTEN_ADDR: :8080
+      TERMCHAT_LISTEN_ADDR: ":8080"
       TERMCHAT_DATABASE_URL: postgres://${POSTGRES_USER:-termchat}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/${POSTGRES_DB:-termchat}?sslmode=disable
       TERMCHAT_JWT_SECRET: ${TERMCHAT_JWT_SECRET:?TERMCHAT_JWT_SECRET must be set}
       TERMCHAT_TOKEN_TTL: ${TERMCHAT_TOKEN_TTL:-24h}

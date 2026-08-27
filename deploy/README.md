@@ -1,12 +1,12 @@
-# TermChat Docker Deployment on Proxmox LXC
+# TermChat Single-Compose Docker Deployment on Proxmox LXC
 
-This deployment runs three containers in one dedicated LXC:
+The repository root contains the only Compose file, `compose.yml`. It runs three containers in one dedicated LXC:
 
 - `server`: the non-root, read-only TermChat Go server
 - `db`: PostgreSQL with a persistent Docker volume
 - `migrate`: a one-shot `golang-migrate` container
 
-Nginx remains in the existing reverse-proxy LXC. PostgreSQL has no published host port. Only the TermChat HTTP/WebSocket port is published on the TermChat LXC's LAN address.
+Nginx remains in the existing reverse-proxy LXC. PostgreSQL has no published host port. Only the TermChat HTTP/WebSocket port is published on the TermChat LXC's LAN address. The Windows/Linux terminal client remains a native application on the user's machine; it is not a server-side container.
 
 ## 1. Prepare the Proxmox LXC
 
@@ -75,12 +75,26 @@ cd /srv/termchat
 
 Alternatively, copy a committed source archive from the development machine and extract it into `/srv/termchat`.
 
-## 4. Create production secrets
+## 4. Prepare the environment file
+
+### Existing deployment
+
+If this LXC was deployed with the previous `deploy/compose.yml` layout, preserve its existing secrets. Run this once and skip the new-installation steps below:
 
 ```bash
-cd /srv/termchat/deploy
-cp compose.env.example compose.env
-chmod 0600 compose.env
+cd /srv/termchat
+test -s deploy/compose.env
+install -m 0600 deploy/compose.env .env
+```
+
+The Compose project name and `postgres-data` volume key are unchanged, so the consolidated file reuses the existing PostgreSQL volume.
+
+### New installation
+
+```bash
+cd /srv/termchat
+cp .env.example .env
+chmod 0600 .env
 openssl rand -hex 32
 openssl rand -hex 32
 ```
@@ -88,7 +102,7 @@ openssl rand -hex 32
 Use the first generated value for `POSTGRES_PASSWORD` and the second for `TERMCHAT_JWT_SECRET`. Edit the file:
 
 ```bash
-nano compose.env
+nano .env
 ```
 
 Set at least:
@@ -111,18 +125,18 @@ Hex values are required here because the Compose file safely embeds the database
 
 ## 5. Validate and start the stack
 
-Run these commands from `/srv/termchat/deploy`:
+Run these commands from `/srv/termchat`. Compose reads `.env` automatically:
 
 ```bash
-docker compose --env-file compose.env -f compose.yml config --quiet
-docker compose --env-file compose.env -f compose.yml pull db migrate
-docker compose --env-file compose.env -f compose.yml up -d --build --wait
+docker compose config --quiet
+docker compose pull db migrate
+docker compose up -d --build --wait --remove-orphans
 ```
 
 Inspect all services, including the completed migration container:
 
 ```bash
-docker compose --env-file compose.env -f compose.yml ps -a
+docker compose ps -a
 ```
 
 Expected state:
@@ -148,8 +162,8 @@ Expected response:
 View logs without printing environment secrets:
 
 ```bash
-docker compose --env-file compose.env -f compose.yml logs --tail=100 server
-docker compose --env-file compose.env -f compose.yml logs --tail=100 db
+docker compose logs --tail=100 server
+docker compose logs --tail=100 db
 ```
 
 ## 6. Configure the separate Nginx LXC
@@ -199,9 +213,9 @@ Prefer the Proxmox firewall for the LXC boundary. Docker's official documentatio
 Create an external backup directory and run a logical dump:
 
 ```bash
-cd /srv/termchat/deploy
+cd /srv/termchat
 install -d -m 0700 /srv/termchat-backups
-docker compose --env-file compose.env -f compose.yml exec -T db \
+docker compose exec -T db \
   sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
   > "/srv/termchat-backups/termchat-$(date +%F-%H%M%S).dump"
 ```
@@ -227,7 +241,9 @@ git pull --ff-only
 VERSION="$(git rev-parse --short=12 HEAD)"
 ```
 
-Back up the database before a release containing migrations. Then edit `deploy/compose.env` and set an immutable image tag:
+On the first update from the previous `deploy/compose.yml` layout, complete the **Existing deployment** step in section 4 immediately after this pull and before running any Compose command.
+
+Back up the database before a release containing migrations. Then edit `.env` and set an immutable image tag:
 
 ```dotenv
 TERMCHAT_IMAGE=termchat-server:COMMIT_HASH
@@ -238,29 +254,28 @@ Use the value printed by `printf '%s\n' "$VERSION"` in place of `COMMIT_HASH`.
 Build the new image without touching the running server:
 
 ```bash
-cd /srv/termchat/deploy
-docker compose --env-file compose.env -f compose.yml build --pull server
+cd /srv/termchat
+docker compose build --pull server
 ```
 
 Run all pending migrations explicitly. This must succeed before the server is replaced:
 
 ```bash
-docker compose --env-file compose.env -f compose.yml run --rm migrate
+docker compose run --rm migrate
 ```
 
 Recreate only the server service:
 
 ```bash
-docker compose --env-file compose.env -f compose.yml \
-  up -d --no-deps --wait server
+docker compose up -d --no-deps --wait server
 ```
 
 Verify:
 
 ```bash
-docker compose --env-file compose.env -f compose.yml ps -a
-curl -fsS http://127.0.0.1:8080/healthz
-docker compose --env-file compose.env -f compose.yml logs --tail=100 server
+docker compose ps -a
+curl -fsS http://TERMCHAT_LXC_IP:8080/healthz
+docker compose logs --tail=100 server
 ```
 
 A server recreation briefly closes current WebSocket connections. The current architecture must remain at one server replica because room presence and broadcasts are held in process memory.
@@ -269,12 +284,11 @@ A server recreation briefly closes current WebSocket connections. The current ar
 
 Keep old `termchat-server:<commit>` images. To roll back an application-only change:
 
-1. Set `TERMCHAT_IMAGE` in `compose.env` to the previous tag.
+1. Set `TERMCHAT_IMAGE` in `.env` to the previous tag.
 2. Run:
 
 ```bash
-docker compose --env-file compose.env -f compose.yml \
-  up -d --no-deps --wait server
+docker compose up -d --no-deps --wait server
 ```
 
 3. Repeat the health and log checks.
@@ -286,13 +300,13 @@ Do not automatically run down-migrations during rollback. A destructive schema m
 Stop without removing containers:
 
 ```bash
-docker compose --env-file compose.env -f compose.yml stop
+docker compose stop
 ```
 
 Remove containers and networks while preserving PostgreSQL data:
 
 ```bash
-docker compose --env-file compose.env -f compose.yml down
+docker compose down
 ```
 
 Do not add `-v` unless the explicit intention is to permanently delete the PostgreSQL volume and all TermChat data.
