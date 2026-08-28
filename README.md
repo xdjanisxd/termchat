@@ -1,6 +1,6 @@
 # TermChat
 
-TermChat is a Windows- and Linux-compatible terminal chat application built around private rooms. Users can clone this repository, build only the client, and connect to an existing TermChat server; Docker and PostgreSQL are not required to use the client.
+TermChat is a Windows-, Linux-, and Apple Silicon macOS-compatible terminal chat application built around private rooms. Users can clone this repository, build only the client, and connect to an existing TermChat server; Docker and PostgreSQL are not required to use the client.
 
 ## Requirements
 
@@ -71,6 +71,36 @@ export TERMCHAT_SERVER_URL="https://termchat.osmanela.xyz"
 ./bin/termchat
 ```
 
+## macOS (Apple Silicon)
+
+This build supports Apple Silicon Macs (M1 or newer). Intel Macs are not currently targeted.
+
+Open Terminal and run these commands in order:
+
+```bash
+git clone https://github.com/xdjanisxd/termchat.git
+cd termchat
+
+./scripts/build-macos-arm64-client.sh
+chmod +x ./dist/termchat-darwin-arm64
+
+curl -fsS "https://termchat.osmanela.xyz/healthz"
+./dist/termchat-darwin-arm64 --server "https://termchat.osmanela.xyz"
+```
+
+Expected health check response:
+
+```json
+{"status":"ok"}
+```
+
+To set the server address for the current shell session:
+
+```bash
+export TERMCHAT_SERVER_URL="https://termchat.osmanela.xyz"
+./dist/termchat-darwin-arm64
+```
+
 ## First Use
 
 When the client opens, register a new user or sign in with an existing account. Basic commands:
@@ -107,6 +137,12 @@ Remove-Item "$env:APPDATA\termchat\session.json" -Force -ErrorAction SilentlyCon
 
 ```bash
 rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/termchat/session.json"
+```
+
+**macOS**
+
+```bash
+rm -f "$HOME/Library/Application Support/termchat/session.json"
 ```
 
 To run the server in your own environment, see the [Docker deployment guide](deploy/README.md).
