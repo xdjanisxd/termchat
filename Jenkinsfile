@@ -20,6 +20,8 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+
+                sh 'chmod +x scripts/deploy.sh'
             }
         }
 
