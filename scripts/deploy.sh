@@ -48,7 +48,7 @@ echo "==> Checking containers"
 docker compose ps -a
 
 echo "==> Checking health"
-curl -fsS http://127.0.0.1:8080/healthz
+curl -fsS http://192.168.1.250:8080/healthz
 
 echo
 echo "==> Deployment successful: ${VERSION}"
