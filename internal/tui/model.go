@@ -55,6 +55,7 @@ type serverEventMsg struct {
 type Model struct {
 	api      *client.Client
 	sessions client.SessionStore
+	theme    tuiTheme
 
 	screen          Screen
 	session         client.Session
@@ -73,6 +74,8 @@ type Model struct {
 }
 
 func NewModel(api *client.Client, sessions client.SessionStore) *Model {
+	theme := newAmberCRTTheme()
+
 	username := textinput.New()
 	username.Prompt = "Username: "
 	username.Placeholder = "alice_01"
@@ -99,8 +102,13 @@ func NewModel(api *client.Client, sessions client.SessionStore) *Model {
 	roomPassword.EchoCharacter = '*'
 	roomPassword.CharLimit = 128
 
+	theme.applyInput(&username)
+	theme.applyInput(&password)
+	theme.applyInput(&commandInput)
+	theme.applyInput(&roomPassword)
+
 	return &Model{
-		api: api, sessions: sessions, screen: ScreenWelcome,
+		api: api, sessions: sessions, theme: theme, screen: ScreenWelcome,
 		username: username, password: password, commandInput: commandInput,
 		roomPassword: roomPassword, width: 80, height: 24,
 	}
@@ -454,7 +462,7 @@ func (m *Model) listenCmd() tea.Cmd {
 }
 
 func (m *Model) View() string {
-	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "#5A56E0", Dark: "#7D7AFF"}).Render("TermChat")
+	title := m.theme.title.Render("TermChat")
 	status := ""
 	if m.status != "" {
 		status = "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#8A3B12", Dark: "#FFB86C"}).Render(m.status)
