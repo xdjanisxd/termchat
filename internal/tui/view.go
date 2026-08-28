@@ -77,8 +77,8 @@ func (m *Model) renderChatHeader(width int) string {
 	}
 
 	left := m.theme.brand.Render("TERMCHAT") + m.theme.muted.Render(" // ") + m.theme.room.Render("#"+roomName)
-	right := m.theme.online.Render("[ONLINE]") + " " + m.theme.input.Render(username)
-	line := joinSides(left, right, width)
+	right := m.renderConnectionBadge() + " " + m.theme.input.Render(username)
+	line := joinSidesPreservingRight(left, right, width)
 	return m.theme.header.Width(width).Render(line)
 }
 
@@ -108,6 +108,19 @@ func joinSides(left, right string, width int) string {
 	if leftWidth+rightWidth+1 > width {
 		return ansi.Truncate(left, width, "")
 	}
+	return left + strings.Repeat(" ", width-leftWidth-rightWidth) + right
+}
+
+func joinSidesPreservingRight(left, right string, width int) string {
+	if width < 1 {
+		return ""
+	}
+	rightWidth := lipgloss.Width(right)
+	if rightWidth >= width {
+		return ansi.Truncate(right, width, "")
+	}
+	left = ansi.Truncate(left, width-rightWidth-1, "")
+	leftWidth := lipgloss.Width(left)
 	return left + strings.Repeat(" ", width-leftWidth-rightWidth) + right
 }
 

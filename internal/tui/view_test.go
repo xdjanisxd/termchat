@@ -21,6 +21,7 @@ func TestChatViewUsesResponsiveContentFirstLayout(t *testing.T) {
 	model.screen = ScreenChat
 	model.session.User.ID = "user-1"
 	model.session.User.Username = "alice"
+	model.connectionState = connectionOnline
 	model.room = &domain.PublicRoom{ID: "room-1", Name: "private_room"}
 	model.messages = []domain.Message{{
 		ID: "message-1", RoomID: "room-1", UserID: "user-2", Username: "bob",

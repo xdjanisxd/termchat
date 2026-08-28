@@ -72,6 +72,7 @@ type Model struct {
 	focus           int
 	status          string
 	statusLevel     statusLevel
+	connectionState connectionState
 	loading         bool
 	width           int
 	height          int
@@ -167,16 +168,20 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = ScreenHome
 		m.focusCommandInput()
 		if msg.connectErr != nil {
+			m.connectionState = connectionOffline
 			m.setStatus(statusError, "Session loaded, but chat connection failed: "+msg.connectErr.Error())
 			return m, nil
 		}
+		m.connectionState = connectionOnline
 		m.setStatus(statusSuccess, "Session restored for "+msg.session.User.Username)
 		return m, m.listenCmd()
 	case connectResultMsg:
 		if msg.err != nil && !errors.Is(msg.err, client.ErrAlreadyConnected) {
+			m.connectionState = connectionOffline
 			m.setStatus(statusError, "Chat connection failed: "+msg.err.Error())
 			return m, nil
 		}
+		m.connectionState = connectionOnline
 		m.setStatus(statusSuccess, "Connected as "+m.session.User.Username)
 		return m, m.listenCmd()
 	case authResultMsg:
@@ -195,6 +200,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.setStatus(statusSuccess, "Authenticated as "+msg.session.User.Username)
 		m.screen = ScreenHome
 		m.focusCommandInput()
+		m.connectionState = connectionConnecting
 		return m, m.connectCmd()
 	case eventSentMsg:
 		if msg.err != nil {
@@ -203,6 +209,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case serverEventMsg:
 		if msg.err != nil {
+			m.connectionState = connectionOffline
 			m.setStatus(statusError, "Connection lost: "+msg.err.Error())
 			return m, nil
 		}
@@ -499,8 +506,8 @@ func (m *Model) View() string {
 		return fmt.Sprintf("%s — %s\n\n%s\n%s\n\nTab: switch field • Enter: submit • Esc: back%s\n",
 			title, action, m.username.View(), m.password.View(), status)
 	case ScreenHome:
-		return fmt.Sprintf("%s\n\nLogged in as: %s\n\n%s\n\n/createroom <name> <password> • /join <name> • /q%s\n",
-			title, m.session.User.Username, m.commandInput.View(), status)
+		return fmt.Sprintf("%s\n\nLogged in as: %s  %s\n\n%s\n\n/createroom <name> <password> • /join <name> • /q%s\n",
+			title, m.session.User.Username, m.renderConnectionBadge(), m.commandInput.View(), status)
 	case ScreenRoomPassword:
 		return fmt.Sprintf("%s\n\nJoin room: %s\n\n%s\n\nEnter: join • Esc: cancel%s\n",
 			title, m.pendingRoomName, m.roomPassword.View(), status)

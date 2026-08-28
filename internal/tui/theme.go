@@ -11,7 +11,9 @@ type tuiTheme struct {
 	title         lipgloss.Style
 	brand         lipgloss.Style
 	room          lipgloss.Style
-	online        lipgloss.Style
+	connOnline    lipgloss.Style
+	connOffline   lipgloss.Style
+	connPending   lipgloss.Style
 	header        lipgloss.Style
 	viewport      lipgloss.Style
 	composer      lipgloss.Style
@@ -46,7 +48,9 @@ func newAmberCRTTheme() tuiTheme {
 		title:         lipgloss.NewStyle().Bold(true).Foreground(brightAmber),
 		brand:         lipgloss.NewStyle().Bold(true).Foreground(brightAmber),
 		room:          lipgloss.NewStyle().Foreground(amber),
-		online:        lipgloss.NewStyle().Bold(true).Foreground(phosphorGreen),
+		connOnline:    lipgloss.NewStyle().Bold(true).Foreground(phosphorGreen),
+		connOffline:   lipgloss.NewStyle().Bold(true).Foreground(errorRed),
+		connPending:   lipgloss.NewStyle().Bold(true).Foreground(brightAmber),
 		header:        lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderBottom(true).BorderForeground(borderAmber),
 		viewport:      lipgloss.NewStyle().Foreground(brightAmber),
 		composer:      lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderTop(true).BorderForeground(borderAmber).Padding(0, 1),
