@@ -111,9 +111,10 @@ When the client opens, register a new user or sign in with an existing account. 
 | `/join <room-name>` | Joins a room through a masked password prompt |
 | `/who` | Shows users currently online in the room |
 | `/l` | Leaves the room |
+| `/help` | Opens the scrollable command reference; press `Esc` to close it |
 | `/q` | Closes the application |
 
-While chatting, use `PgUp` and `PgDn` to scroll through message history; the composer and status bar remain visible.
+While chatting, use `PgUp` and `PgDn` to scroll through message history; the composer and status bar remain visible. The help screen uses the same keys when its command list is taller than the terminal.
 
 Do not append `/v1` or `/v1/ws` to the server URL; the client creates the required API and WebSocket paths automatically.
 

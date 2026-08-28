@@ -28,6 +28,7 @@ const (
 	ScreenHome
 	ScreenRoomPassword
 	ScreenChat
+	ScreenHelp
 )
 
 type authResultMsg struct {
@@ -59,23 +60,25 @@ type Model struct {
 	sessions client.SessionStore
 	theme    tuiTheme
 
-	screen          Screen
-	session         client.Session
-	username        textinput.Model
-	password        textinput.Model
-	commandInput    textinput.Model
-	roomPassword    textinput.Model
-	viewport        viewport.Model
-	pendingRoomName string
-	room            *domain.PublicRoom
-	messages        []domain.Message
-	focus           int
-	status          string
-	statusLevel     statusLevel
-	connectionState connectionState
-	loading         bool
-	width           int
-	height          int
+	screen           Screen
+	session          client.Session
+	username         textinput.Model
+	password         textinput.Model
+	commandInput     textinput.Model
+	roomPassword     textinput.Model
+	viewport         viewport.Model
+	helpViewport     viewport.Model
+	helpReturnScreen Screen
+	pendingRoomName  string
+	room             *domain.PublicRoom
+	messages         []domain.Message
+	focus            int
+	status           string
+	statusLevel      statusLevel
+	connectionState  connectionState
+	loading          bool
+	width            int
+	height           int
 }
 
 func NewModel(api *client.Client, sessions client.SessionStore) *Model {
@@ -115,7 +118,7 @@ func NewModel(api *client.Client, sessions client.SessionStore) *Model {
 	return &Model{
 		api: api, sessions: sessions, theme: theme, screen: ScreenWelcome,
 		username: username, password: password, commandInput: commandInput,
-		roomPassword: roomPassword, viewport: viewport.New(80, 19), width: 80, height: 24,
+		roomPassword: roomPassword, viewport: viewport.New(80, 19), helpViewport: viewport.New(80, 21), width: 80, height: 24,
 	}
 }
 
@@ -155,6 +158,8 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		if m.screen == ScreenChat {
 			m.syncChatLayout()
+		} else if m.screen == ScreenHelp {
+			m.syncHelpLayout()
 		}
 		return m, nil
 	case sessionRestoreMsg:
@@ -232,6 +237,8 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateCommandInput(msg)
 		case ScreenRoomPassword:
 			return m.updateRoomPassword(msg)
+		case ScreenHelp:
+			return m.updateHelp(msg)
 		}
 	}
 	return m, nil
@@ -311,7 +318,11 @@ func (m *Model) updateCommandInput(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 	switch command.Kind {
 	case CommandHelp:
-		m.setStatus(statusInfo, "/createroom <name> <password> • /join <name> • /l • /who • /roompasswd <password> • /deleteroom • /q")
+		m.helpReturnScreen = m.screen
+		m.screen = ScreenHelp
+		m.commandInput.Blur()
+		m.helpViewport.GotoTop()
+		m.syncHelpLayout()
 	case CommandCreateRoom:
 		return m, m.sendEventCmd(protocol.ClientEvent{
 			Type: "create_room", RequestID: uuid.NewString(), RoomName: command.Args[0], Password: command.Args[1],
@@ -513,6 +524,8 @@ func (m *Model) View() string {
 			title, m.pendingRoomName, m.roomPassword.View(), status)
 	case ScreenChat:
 		return m.renderChatView()
+	case ScreenHelp:
+		return m.renderHelpView()
 	default:
 		return title + status + "\n"
 	}

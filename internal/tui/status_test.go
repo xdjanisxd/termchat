@@ -57,15 +57,14 @@ func TestNewStatusReplacesPreviousSemanticLevel(t *testing.T) {
 	model.room = &domain.PublicRoom{ID: "room-1", Name: "private_room"}
 	updateModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 24})
 	updateModel(t, model, serverEventMsg{err: errors.New("offline")})
-	model.commandInput.SetValue("/help")
 
-	updateModel(t, model, tea.KeyMsg{Type: tea.KeyEnter})
+	updateModel(t, model, serverEventMsg{event: protocol.ServerEvent{Type: "user_joined", Username: "bob"}})
 
 	plain := ansi.Strip(model.View())
-	if !strings.Contains(plain, "[INFO] /createroom") {
+	if !strings.Contains(plain, "[INFO] bob joined the room.") {
 		t.Fatalf("View() did not replace prior error level with info:\n%s", plain)
 	}
-	if strings.Contains(plain, "[ERROR] /createroom") {
+	if strings.Contains(plain, "[ERROR] bob joined the room.") {
 		t.Fatalf("View() retained stale error level:\n%s", plain)
 	}
 }
