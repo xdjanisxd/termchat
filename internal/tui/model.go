@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
@@ -63,6 +64,7 @@ type Model struct {
 	password        textinput.Model
 	commandInput    textinput.Model
 	roomPassword    textinput.Model
+	viewport        viewport.Model
 	pendingRoomName string
 	room            *domain.PublicRoom
 	messages        []domain.Message
@@ -110,7 +112,7 @@ func NewModel(api *client.Client, sessions client.SessionStore) *Model {
 	return &Model{
 		api: api, sessions: sessions, theme: theme, screen: ScreenWelcome,
 		username: username, password: password, commandInput: commandInput,
-		roomPassword: roomPassword, width: 80, height: 24,
+		roomPassword: roomPassword, viewport: viewport.New(80, 19), width: 80, height: 24,
 	}
 }
 
@@ -148,6 +150,9 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		if m.screen == ScreenChat {
+			m.syncChatLayout()
+		}
 		return m, nil
 	case sessionRestoreMsg:
 		if msg.loadErr != nil {
@@ -200,6 +205,9 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.applyServerEvent(msg.event)
+		if m.screen == ScreenChat {
+			m.syncChatLayout()
+		}
 		return m, m.listenCmd()
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
@@ -269,6 +277,11 @@ func (m *Model) updateAuthentication(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) updateCommandInput(message tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.screen == ScreenChat && (message.Type == tea.KeyPgUp || message.Type == tea.KeyPgDown) {
+		var command tea.Cmd
+		m.viewport, command = m.viewport.Update(message)
+		return m, command
+	}
 	if message.Type != tea.KeyEnter {
 		var command tea.Cmd
 		m.commandInput, command = m.commandInput.Update(message)
@@ -418,6 +431,11 @@ func (m *Model) focusCommandInput() {
 	m.username.Blur()
 	m.password.Blur()
 	m.roomPassword.Blur()
+	if m.screen == ScreenChat {
+		m.commandInput.Placeholder = "Type a message or /help"
+	} else {
+		m.commandInput.Placeholder = "/join private_room"
+	}
 	m.commandInput.Focus()
 }
 
@@ -485,12 +503,7 @@ func (m *Model) View() string {
 		return fmt.Sprintf("%s\n\nJoin room: %s\n\n%s\n\nEnter: join • Esc: cancel%s\n",
 			title, m.pendingRoomName, m.roomPassword.View(), status)
 	case ScreenChat:
-		roomName := "room"
-		if m.room != nil {
-			roomName = m.room.Name
-		}
-		return fmt.Sprintf("%s — # %s\n\n%s\n\n%s%s\n",
-			title, roomName, m.renderMessages(), m.commandInput.View(), status)
+		return m.renderChatView()
 	default:
 		return title + status + "\n"
 	}
