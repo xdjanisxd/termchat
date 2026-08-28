@@ -11,7 +11,7 @@ flowchart TD
   PROMPT -->|doğru| CHAT[Sohbet ekranı + son 50 mesaj]
   PROMPT -->|yanlış| HOME
   CREATE --> CHAT
-  CHAT -->|/leave| HOME
+  CHAT -->|/l| HOME
   CHAT -->|/roompasswd yeni-parola| CHANGE[Sunucu sahibi doğrulaması]
   CHAT -->|/deleteroom| DELETE[Sunucu sahibi doğrulaması + onay]
   CHANGE --> CHAT
@@ -25,11 +25,11 @@ flowchart TD
 | `/help` | her yer | kullanılabilir komutları gösterir |
 | `/createroom <oda-adı> <oda-parolası>` | ana ekran | oda oluşturur ve kullanıcıyı odaya alır |
 | `/join <oda-adı>` | ana ekran | maskeli parola istemi açar; parolayı terminal geçmişine yazmaz |
-| `/leave` | oda | odadan ayrılır, ana ekrana döner |
+| `/l` | oda | odadan ayrılır, ana ekrana döner |
 | `/who` | oda | o an WebSocket ile bağlı oda kullanıcılarını gösterir |
 | `/roompasswd <yeni-parola>` | oda sahibi | oda parolasını değiştirir |
 | `/deleteroom` | oda sahibi | açık onaydan sonra oda ve mesajlarını siler |
-| `/quit` | her yer | istemciyi kapatır |
+| `/q` | her yer | istemciyi kapatır |
 
 ## REST API
 

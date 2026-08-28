@@ -14,11 +14,11 @@ func TestParseInputCommands(t *testing.T) {
 		{input: "/help", kind: CommandHelp},
 		{input: "/createroom private_room roompass", kind: CommandCreateRoom, args: []string{"private_room", "roompass"}},
 		{input: "/join private_room", kind: CommandJoinRoom, args: []string{"private_room"}},
-		{input: "/leave", kind: CommandLeaveRoom},
+		{input: "/l", kind: CommandLeaveRoom},
 		{input: "/who", kind: CommandWho},
 		{input: "/roompasswd new-pass", kind: CommandChangeRoomPassword, args: []string{"new-pass"}},
 		{input: "/deleteroom", kind: CommandDeleteRoom},
-		{input: "/quit", kind: CommandQuit},
+		{input: "/q", kind: CommandQuit},
 	} {
 		t.Run(tc.input, func(t *testing.T) {
 			command, err := ParseInput(tc.input)
@@ -36,7 +36,7 @@ func TestParseInputRejectsInvalidCommandShape(t *testing.T) {
 	t.Parallel()
 
 	for _, input := range []string{
-		"", "/unknown", "/join", "/join room password", "/createroom room", "/leave extra", "/deleteroom now",
+		"", "/unknown", "/join", "/join room password", "/createroom room", "/l extra", "/deleteroom now",
 	} {
 		if _, err := ParseInput(input); err == nil {
 			t.Fatalf("ParseInput(%q) accepted invalid input", input)

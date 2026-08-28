@@ -360,8 +360,8 @@ MVP için:
 ```text
 /help
 /rooms
-/leave
-/quit
+/l
+/q
 /who
 ```
 
@@ -380,13 +380,13 @@ Mevcut command'leri gösterir.
 Room listesini gösterir.
 
 ```text
-/leave
+/l
 ```
 
 Mevcut room'dan çıkar.
 
 ```text
-/quit
+/q
 ```
 
 Uygulamayı kapatır.

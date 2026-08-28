@@ -44,11 +44,11 @@ func ParseInput(input string) (Command, error) {
 		"/help":       {kind: CommandHelp},
 		"/createroom": {kind: CommandCreateRoom, argCount: 2},
 		"/join":       {kind: CommandJoinRoom, argCount: 1},
-		"/leave":      {kind: CommandLeaveRoom},
+		"/l":          {kind: CommandLeaveRoom},
 		"/who":        {kind: CommandWho},
 		"/roompasswd": {kind: CommandChangeRoomPassword, argCount: 1},
 		"/deleteroom": {kind: CommandDeleteRoom},
-		"/quit":       {kind: CommandQuit},
+		"/q":          {kind: CommandQuit},
 	}
 	definition, exists := definitions[fields[0]]
 	if !exists {

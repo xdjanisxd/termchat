@@ -80,8 +80,10 @@ When the client opens, register a new user or sign in with an existing account. 
 | `/createroom <room-name> <password>` | Creates a private room |
 | `/join <room-name>` | Joins a room through a masked password prompt |
 | `/who` | Shows users currently online in the room |
-| `/leave` | Leaves the room |
-| `/quit` | Closes the application |
+| `/l` | Leaves the room |
+| `/q` | Closes the application |
+
+While chatting, use `PgUp` and `PgDn` to scroll through message history; the composer and status bar remain visible.
 
 Do not append `/v1` or `/v1/ws` to the server URL; the client creates the required API and WebSocket paths automatically.
 
