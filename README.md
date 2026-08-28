@@ -25,8 +25,8 @@ cd termchat
 New-Item -ItemType Directory -Force ./bin | Out-Null
 go build -o ./bin/termchat.exe ./cmd/client
 
-curl.exe -fsS "https://termchat.osmanela.com/healthz"
-./bin/termchat.exe --server "https://termchat.osmanela.com"
+curl.exe -fsS "https://termchat.osmanela.xyz/healthz"
+./bin/termchat.exe --server "https://termchat.osmanela.xyz"
 ```
 
 Expected health check response:
@@ -38,7 +38,7 @@ Expected health check response:
 To set the server address for the current PowerShell session:
 
 ```powershell
-$env:TERMCHAT_SERVER_URL = "https://termchat.osmanela.com"
+$env:TERMCHAT_SERVER_URL = "https://termchat.osmanela.xyz"
 ./bin/termchat.exe
 ```
 
@@ -54,8 +54,8 @@ mkdir -p ./bin
 CGO_ENABLED=0 go build -o ./bin/termchat ./cmd/client
 chmod +x ./bin/termchat
 
-curl -fsS "https://termchat.osmanela.com/healthz"
-./bin/termchat --server "https://termchat.osmanela.com"
+curl -fsS "https://termchat.osmanela.xyz/healthz"
+./bin/termchat --server "https://termchat.osmanela.xyz"
 ```
 
 Expected health check response:
@@ -67,7 +67,7 @@ Expected health check response:
 To set the server address for the current shell session:
 
 ```bash
-export TERMCHAT_SERVER_URL="https://termchat.osmanela.com"
+export TERMCHAT_SERVER_URL="https://termchat.osmanela.xyz"
 ./bin/termchat
 ```
 
@@ -92,7 +92,7 @@ Do not append `/v1` or `/v1/ws` to the server URL; the client creates the requir
 If the server cannot be reached, check this endpoint first:
 
 ```text
-https://termchat.osmanela.com/healthz
+https://termchat.osmanela.xyz/healthz
 ```
 
 To clear a stale or invalid session:

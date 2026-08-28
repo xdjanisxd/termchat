@@ -304,7 +304,7 @@ func (m *Model) updateCommandInput(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 	switch command.Kind {
 	case CommandHelp:
-		m.setStatus(statusInfo, "/createroom <name> <password> • /join <name> • /leave • /who • /roompasswd <password> • /deleteroom • /quit")
+		m.setStatus(statusInfo, "/createroom <name> <password> • /join <name> • /l • /who • /roompasswd <password> • /deleteroom • /q")
 	case CommandCreateRoom:
 		return m, m.sendEventCmd(protocol.ClientEvent{
 			Type: "create_room", RequestID: uuid.NewString(), RoomName: command.Args[0], Password: command.Args[1],
@@ -499,7 +499,7 @@ func (m *Model) View() string {
 		return fmt.Sprintf("%s — %s\n\n%s\n%s\n\nTab: switch field • Enter: submit • Esc: back%s\n",
 			title, action, m.username.View(), m.password.View(), status)
 	case ScreenHome:
-		return fmt.Sprintf("%s\n\nLogged in as: %s\n\n%s\n\n/createroom <name> <password> • /join <name> • /quit%s\n",
+		return fmt.Sprintf("%s\n\nLogged in as: %s\n\n%s\n\n/createroom <name> <password> • /join <name> • /q%s\n",
 			title, m.session.User.Username, m.commandInput.View(), status)
 	case ScreenRoomPassword:
 		return fmt.Sprintf("%s\n\nJoin room: %s\n\n%s\n\nEnter: join • Esc: cancel%s\n",
