@@ -92,7 +92,7 @@ func (m *Model) renderChatFooter(width int) string {
 	if m.status == "" {
 		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
 	}
-	return m.theme.footer.Width(width).Render(joinSides(m.status, hints, width))
+	return m.theme.footer.Width(width).Render(joinSides(m.renderStatus(), hints, width))
 }
 
 func (m *Model) terminalSize() (int, int) {
