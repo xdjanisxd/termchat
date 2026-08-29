@@ -75,7 +75,7 @@ func TestHelpScreenScrollsWithinSmallTerminal(t *testing.T) {
 	if !strings.Contains(initialPlain, "TERMCHAT // HELP") || !strings.Contains(initialPlain, "ROOMS") {
 		t.Fatalf("initial help view missing fixed header or first section:\n%s", initialPlain)
 	}
-	if !strings.Contains(initialPlain, "PgUp/PgDn scroll") || !strings.Contains(initialPlain, "Esc close") {
+	if !strings.Contains(initialPlain, "PgUp/K • PgDn/J") || !strings.Contains(initialPlain, "Esc close") {
 		t.Fatalf("initial help view missing navigation hints:\n%s", initialPlain)
 	}
 	if got := lipgloss.Width(initial); got > 30 {

@@ -114,7 +114,7 @@ When the client opens, register a new user or sign in with an existing account. 
 | `/help` | Opens the scrollable command reference; press `Esc` to close it |
 | `/q` | Closes the application |
 
-While chatting, use `PgUp` and `PgDn` to scroll through message history; the composer and status bar remain visible. The help screen uses the same keys when its command list is taller than the terminal.
+While chatting, use `PgUp` or uppercase `K` to scroll up and `PgDn` or uppercase `J` to scroll down; lowercase `j` and `k` remain normal composer input. The help screen uses the same scrolling keys when its command list is taller than the terminal.
 
 Do not append `/v1` or `/v1/ws` to the server URL; the client creates the required API and WebSocket paths automatically.
 

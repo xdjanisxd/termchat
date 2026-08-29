@@ -88,7 +88,7 @@ func (m *Model) renderChatComposer(width int) string {
 }
 
 func (m *Model) renderChatFooter(width int) string {
-	hints := "PgUp/PgDn scroll • /help commands • Ctrl+C quit"
+	hints := "PgUp/K up • PgDn/J down • /help commands • Ctrl+C quit"
 	if m.status == "" {
 		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
 	}
