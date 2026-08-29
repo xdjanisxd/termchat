@@ -85,10 +85,9 @@ func (m *Model) updateHelp(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.screen = m.helpReturnScreen
 		m.focusCommandInput()
 		return m, nil
-	}
-	if scrollMessage, ok := pageScrollMessage(message); ok {
+	case tea.KeyPgUp, tea.KeyPgDown:
 		var command tea.Cmd
-		m.helpViewport, command = m.helpViewport.Update(scrollMessage)
+		m.helpViewport, command = m.helpViewport.Update(message)
 		return m, command
 	}
 	return m, nil
@@ -99,7 +98,7 @@ func (m *Model) renderHelpView() string {
 	m.syncHelpLayout()
 	headerText := m.theme.brand.Render("TERMCHAT") + m.theme.muted.Render(" // ") + m.theme.room.Render("HELP")
 	header := m.theme.header.Width(width).Render(ansi.Truncate(headerText, width, ""))
-	footer := m.theme.footer.Width(width).Render(ansi.Truncate("PgUp/K • PgDn/J • Esc close", width, ""))
+	footer := m.theme.footer.Width(width).Render(ansi.Truncate("PgUp/PgDn scroll • Esc close", width, ""))
 	content := lipgloss.JoinVertical(lipgloss.Left, header, m.helpViewport.View(), footer)
 	return m.theme.root.Width(width).Height(height).Render(content)
 }

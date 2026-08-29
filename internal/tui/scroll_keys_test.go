@@ -10,82 +10,79 @@ import (
 	"termchat.local/termchat/internal/domain"
 )
 
-func TestUppercaseKPagesChatViewportUp(t *testing.T) {
+func TestUppercaseKIsNotScrollAlias(t *testing.T) {
 	t.Parallel()
 
-	model := newScrollableChatModel()
-	updateModel(t, model, tea.WindowSizeMsg{Width: 60, Height: 10})
-	_ = model.View()
-	before := model.viewport.YOffset
-	if before == 0 {
-		t.Fatal("test setup did not produce scrollable viewport content")
-	}
+	t.Run("chat composer", func(t *testing.T) {
+		model := newScrollableChatModel()
+		updateModel(t, model, tea.WindowSizeMsg{Width: 60, Height: 10})
+		_ = model.View()
+		before := model.viewport.YOffset
 
-	updateModel(t, model, keyRunes("K"))
+		updateModel(t, model, keyRunes("K"))
 
-	if model.viewport.YOffset >= before {
-		t.Fatalf("viewport offset after K = %d, want less than %d", model.viewport.YOffset, before)
-	}
-	if model.commandInput.Value() != "" {
-		t.Fatalf("composer changed after K scroll: %q", model.commandInput.Value())
-	}
+		if model.viewport.YOffset != before {
+			t.Fatalf("viewport offset after K = %d, want %d", model.viewport.YOffset, before)
+		}
+		if model.commandInput.Value() != "K" {
+			t.Fatalf("composer value after K = %q, want %q", model.commandInput.Value(), "K")
+		}
+	})
+
+	t.Run("help viewport", func(t *testing.T) {
+		model := NewModel(nil, client.SessionStore{})
+		model.screen = ScreenHelp
+		updateModel(t, model, tea.WindowSizeMsg{Width: 30, Height: 8})
+		_ = model.View()
+		for range 3 {
+			updateModel(t, model, tea.KeyMsg{Type: tea.KeyPgDown})
+		}
+		before := model.helpViewport.YOffset
+		if before == 0 {
+			t.Fatal("test setup did not scroll help viewport")
+		}
+
+		updateModel(t, model, keyRunes("K"))
+
+		if model.helpViewport.YOffset != before {
+			t.Fatalf("help viewport offset after K = %d, want %d", model.helpViewport.YOffset, before)
+		}
+	})
 }
 
-func TestUppercaseJPagesChatViewportDown(t *testing.T) {
+func TestUppercaseJIsNotScrollAlias(t *testing.T) {
 	t.Parallel()
 
-	model := newScrollableChatModel()
-	updateModel(t, model, tea.WindowSizeMsg{Width: 60, Height: 10})
-	_ = model.View()
-	updateModel(t, model, keyRunes("K"))
-	before := model.viewport.YOffset
+	t.Run("chat composer", func(t *testing.T) {
+		model := newScrollableChatModel()
+		updateModel(t, model, tea.WindowSizeMsg{Width: 60, Height: 10})
+		_ = model.View()
+		updateModel(t, model, tea.KeyMsg{Type: tea.KeyPgUp})
+		before := model.viewport.YOffset
 
-	updateModel(t, model, keyRunes("J"))
-
-	if model.viewport.YOffset <= before {
-		t.Fatalf("viewport offset after J = %d, want greater than %d", model.viewport.YOffset, before)
-	}
-	if model.commandInput.Value() != "" {
-		t.Fatalf("composer changed after J scroll: %q", model.commandInput.Value())
-	}
-}
-
-func TestUppercaseJPagesHelpViewportDown(t *testing.T) {
-	t.Parallel()
-
-	model := NewModel(nil, client.SessionStore{})
-	model.screen = ScreenHelp
-	updateModel(t, model, tea.WindowSizeMsg{Width: 30, Height: 8})
-	_ = model.View()
-	before := model.helpViewport.YOffset
-
-	updateModel(t, model, keyRunes("J"))
-
-	if model.helpViewport.YOffset <= before {
-		t.Fatalf("help viewport offset after J = %d, want greater than %d", model.helpViewport.YOffset, before)
-	}
-}
-
-func TestUppercaseKPagesHelpViewportUp(t *testing.T) {
-	t.Parallel()
-
-	model := NewModel(nil, client.SessionStore{})
-	model.screen = ScreenHelp
-	updateModel(t, model, tea.WindowSizeMsg{Width: 30, Height: 8})
-	_ = model.View()
-	for range 3 {
 		updateModel(t, model, keyRunes("J"))
-	}
-	before := model.helpViewport.YOffset
-	if before == 0 {
-		t.Fatal("test setup did not scroll help viewport")
-	}
 
-	updateModel(t, model, keyRunes("K"))
+		if model.viewport.YOffset != before {
+			t.Fatalf("viewport offset after J = %d, want %d", model.viewport.YOffset, before)
+		}
+		if model.commandInput.Value() != "J" {
+			t.Fatalf("composer value after J = %q, want %q", model.commandInput.Value(), "J")
+		}
+	})
 
-	if model.helpViewport.YOffset >= before {
-		t.Fatalf("help viewport offset after K = %d, want less than %d", model.helpViewport.YOffset, before)
-	}
+	t.Run("help viewport", func(t *testing.T) {
+		model := NewModel(nil, client.SessionStore{})
+		model.screen = ScreenHelp
+		updateModel(t, model, tea.WindowSizeMsg{Width: 30, Height: 8})
+		_ = model.View()
+		before := model.helpViewport.YOffset
+
+		updateModel(t, model, keyRunes("J"))
+
+		if model.helpViewport.YOffset != before {
+			t.Fatalf("help viewport offset after J = %d, want %d", model.helpViewport.YOffset, before)
+		}
+	})
 }
 
 func TestLowercaseJKRemainComposerInput(t *testing.T) {

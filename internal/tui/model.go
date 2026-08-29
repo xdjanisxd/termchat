@@ -293,12 +293,10 @@ func (m *Model) updateAuthentication(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) updateCommandInput(message tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.screen == ScreenChat {
-		if scrollMessage, ok := pageScrollMessage(message); ok {
-			var command tea.Cmd
-			m.viewport, command = m.viewport.Update(scrollMessage)
-			return m, command
-		}
+	if m.screen == ScreenChat && (message.Type == tea.KeyPgUp || message.Type == tea.KeyPgDown) {
+		var command tea.Cmd
+		m.viewport, command = m.viewport.Update(message)
+		return m, command
 	}
 	if message.Type != tea.KeyEnter {
 		var command tea.Cmd

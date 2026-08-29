@@ -36,7 +36,7 @@ func TestChatViewUsesResponsiveContentFirstLayout(t *testing.T) {
 		"[ONLINE] alice",
 		"hello from the viewport",
 		"Type a message or /help",
-		"PgUp/K up • PgDn/J down",
+		"PgUp/PgDn scroll",
 	} {
 		if !strings.Contains(plain, marker) {
 			t.Fatalf("View() missing %q:\n%s", marker, plain)
