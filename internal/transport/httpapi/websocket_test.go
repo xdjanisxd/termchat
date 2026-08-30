@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -156,6 +157,149 @@ func TestChatHandlerCreatesJoinsAndBroadcasts(t *testing.T) {
 	defer messageRepository.mu.Unlock()
 	if len(messageRepository.messages) != 1 {
 		t.Fatalf("persisted messages = %d, want 1", len(messageRepository.messages))
+	}
+}
+
+func TestChatHandlerBlocksAllEventsAfterFourFailedRoomPasswords(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	hasher := security.NewPasswordHasher(security.Argon2Params{Memory: 8 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32})
+	roomService := app.NewRoomService(newWSRoomRepository(), hasher)
+	messageService := app.NewMessageService(&wsMessageRepository{})
+	attempts := app.NewAttemptLimiter(4, 5*time.Minute)
+	tokens := security.NewTokenManager([]byte("01234567890123456789012345678901"), time.Hour)
+	chat := NewChatHandler(roomService, messageService, NewAttemptGuard(attempts, false))
+	router := chi.NewRouter()
+	router.With(TokenMiddleware(tokens)).Get("/v1/ws", chat.ServeHTTP)
+	server := httptest.NewServer(router)
+	defer server.Close()
+	websocketURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/ws"
+
+	ownerToken, _ := tokens.Issue("owner-1", "alice", time.Now().UTC())
+	memberToken, _ := tokens.Issue("user-2", "bob", time.Now().UTC())
+	owner := dialTestWebSocket(t, ctx, websocketURL, ownerToken)
+	defer owner.Close(websocket.StatusNormalClosure, "test complete")
+	member := dialTestWebSocket(t, ctx, websocketURL, memberToken)
+	defer member.Close(websocket.StatusNormalClosure, "test complete")
+
+	if err := wsjson.Write(ctx, owner, ClientEvent{Type: "create_room", RequestID: "create-1", RoomName: "private_room", Password: "roompass"}); err != nil {
+		t.Fatalf("owner create write: %v", err)
+	}
+	readUntilEvent(t, ctx, owner, "room_joined")
+
+	for attempt := 1; attempt <= 4; attempt++ {
+		requestID := fmt.Sprintf("join-%d", attempt)
+		if err := wsjson.Write(ctx, member, ClientEvent{Type: "join_room", RequestID: requestID, RoomName: "private_room", Password: "wrongpass"}); err != nil {
+			t.Fatalf("member failed join %d write: %v", attempt, err)
+		}
+		response := readUntilEvent(t, ctx, member, "error")
+		if response.Error == nil || response.Error.Code != "INVALID_ROOM_CREDENTIALS" {
+			t.Fatalf("member failed join %d response = %#v", attempt, response)
+		}
+	}
+
+	if err := wsjson.Write(ctx, member, ClientEvent{Type: "ping", RequestID: "ping-blocked"}); err != nil {
+		t.Fatalf("member ping write: %v", err)
+	}
+	response := readUntilEvent(t, ctx, member, "error")
+	if response.RequestID != "ping-blocked" || response.Error == nil || response.Error.Code != "RATE_LIMITED" {
+		t.Fatalf("blocked ping response = %#v", response)
+	}
+}
+
+func TestChatHandlerBlocksExistingConnectionAfterFourFailedLoginsFromSameIP(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	hasher := security.NewPasswordHasher(security.Argon2Params{Memory: 8 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32})
+	tokens := security.NewTokenManager([]byte("01234567890123456789012345678901"), time.Hour)
+	attempts := app.NewAttemptLimiter(4, 5*time.Minute)
+	guard := NewAttemptGuard(attempts, false)
+	authService := app.NewAuthService(&testUserRepository{users: make(map[string]domain.User)}, hasher, tokens)
+	chat := NewChatHandler(app.NewRoomService(newWSRoomRepository(), hasher), app.NewMessageService(&wsMessageRepository{}), guard)
+	router := NewRouter(NewAuthHandler(authService, guard).Routes(), TokenMiddleware(tokens), chat, func(context.Context) error { return nil }, guard)
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	token, err := tokens.Issue("user-1", "alice", time.Now().UTC())
+	if err != nil {
+		t.Fatalf("Issue() error = %v", err)
+	}
+	conn := dialTestWebSocket(t, ctx, "ws"+strings.TrimPrefix(server.URL, "http")+"/v1/ws", token)
+	defer conn.Close(websocket.StatusNormalClosure, "test complete")
+
+	for attempt := 1; attempt <= 4; attempt++ {
+		response, err := http.Post(server.URL+"/v1/auth/login", "application/json", strings.NewReader(`{"username":"alice","password":"wrong-password"}`))
+		if err != nil {
+			t.Fatalf("failed login %d: %v", attempt, err)
+		}
+		_ = response.Body.Close()
+		if response.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("failed login %d status = %d, want %d", attempt, response.StatusCode, http.StatusUnauthorized)
+		}
+	}
+
+	if err := wsjson.Write(ctx, conn, ClientEvent{Type: "ping", RequestID: "ping-blocked-by-ip"}); err != nil {
+		t.Fatalf("ping write: %v", err)
+	}
+	response := readUntilEvent(t, ctx, conn, "error")
+	if response.RequestID != "ping-blocked-by-ip" || response.Error == nil || response.Error.Code != "RATE_LIMITED" {
+		t.Fatalf("blocked ping response = %#v", response)
+	}
+}
+
+func TestChatHandlerSuccessfulRoomJoinResetsFailures(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	hasher := security.NewPasswordHasher(security.Argon2Params{Memory: 8 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32})
+	roomService := app.NewRoomService(newWSRoomRepository(), hasher)
+	messageService := app.NewMessageService(&wsMessageRepository{})
+	attempts := app.NewAttemptLimiter(4, 5*time.Minute)
+	tokens := security.NewTokenManager([]byte("01234567890123456789012345678901"), time.Hour)
+	chat := NewChatHandler(roomService, messageService, NewAttemptGuard(attempts, false))
+	router := chi.NewRouter()
+	router.With(TokenMiddleware(tokens)).Get("/v1/ws", chat.ServeHTTP)
+	server := httptest.NewServer(router)
+	defer server.Close()
+	websocketURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/ws"
+
+	ownerToken, _ := tokens.Issue("owner-1", "alice", time.Now().UTC())
+	memberToken, _ := tokens.Issue("user-2", "bob", time.Now().UTC())
+	owner := dialTestWebSocket(t, ctx, websocketURL, ownerToken)
+	defer owner.Close(websocket.StatusNormalClosure, "test complete")
+	member := dialTestWebSocket(t, ctx, websocketURL, memberToken)
+	defer member.Close(websocket.StatusNormalClosure, "test complete")
+
+	if err := wsjson.Write(ctx, owner, ClientEvent{Type: "create_room", RequestID: "create-1", RoomName: "private_room", Password: "roompass"}); err != nil {
+		t.Fatalf("owner create write: %v", err)
+	}
+	readUntilEvent(t, ctx, owner, "room_joined")
+	for attempt := 1; attempt <= 3; attempt++ {
+		if err := wsjson.Write(ctx, member, ClientEvent{Type: "join_room", RequestID: fmt.Sprintf("wrong-before-%d", attempt), RoomName: "private_room", Password: "wrongpass"}); err != nil {
+			t.Fatalf("member pre-reset join %d write: %v", attempt, err)
+		}
+		readUntilEvent(t, ctx, member, "error")
+	}
+	if err := wsjson.Write(ctx, member, ClientEvent{Type: "join_room", RequestID: "join-valid", RoomName: "private_room", Password: "roompass"}); err != nil {
+		t.Fatalf("member valid join write: %v", err)
+	}
+	readUntilEvent(t, ctx, member, "room_joined")
+	if err := wsjson.Write(ctx, member, ClientEvent{Type: "leave_room", RequestID: "leave-1"}); err != nil {
+		t.Fatalf("member leave write: %v", err)
+	}
+	readUntilEvent(t, ctx, member, "room_left")
+	if err := wsjson.Write(ctx, member, ClientEvent{Type: "join_room", RequestID: "wrong-after", RoomName: "private_room", Password: "wrongpass"}); err != nil {
+		t.Fatalf("member post-reset join write: %v", err)
+	}
+	readUntilEvent(t, ctx, member, "error")
+	if err := wsjson.Write(ctx, member, ClientEvent{Type: "ping", RequestID: "ping-allowed"}); err != nil {
+		t.Fatalf("member ping write: %v", err)
+	}
+	response := readUntilEvent(t, ctx, member, "pong")
+	if response.RequestID != "ping-allowed" {
+		t.Fatalf("pong response = %#v", response)
 	}
 }
 

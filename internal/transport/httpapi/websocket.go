@@ -18,10 +18,15 @@ type ChatHandler struct {
 	rooms    *app.RoomService
 	messages *app.MessageService
 	hub      *chatHub
+	attempts *AttemptGuard
 }
 
-func NewChatHandler(rooms *app.RoomService, messages *app.MessageService) *ChatHandler {
-	return &ChatHandler{rooms: rooms, messages: messages, hub: newChatHub()}
+func NewChatHandler(rooms *app.RoomService, messages *app.MessageService, attempts ...*AttemptGuard) *ChatHandler {
+	handler := &ChatHandler{rooms: rooms, messages: messages, hub: newChatHub()}
+	if len(attempts) > 0 {
+		handler.attempts = attempts[0]
+	}
+	return handler
 }
 
 func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -36,6 +41,9 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	conn.SetReadLimit(16 * 1024)
 	client := &chatClient{conn: conn, identity: identity}
+	if h.attempts != nil {
+		client.clientIP = h.attempts.clientIP(r)
+	}
 	defer func() {
 		h.hub.leave(client)
 		_ = conn.Close(websocket.StatusNormalClosure, "connection closed")
@@ -53,6 +61,13 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *ChatHandler) handle(client *chatClient, event ClientEvent) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if h.attempts != nil {
+		now := time.Now().UTC()
+		if h.attempts.isIPBlocked(client.clientIP, now) || h.attempts.IsUserBlocked(client.identity.UserID, now) {
+			client.write(namedError(event.RequestID, "RATE_LIMITED", attemptRateLimitMessage))
+			return
+		}
+	}
 
 	switch event.Type {
 	case "create_room":
@@ -71,8 +86,14 @@ func (h *ChatHandler) handle(client *chatClient, event ClientEvent) {
 	case "join_room":
 		room, err := h.rooms.Join(ctx, client.identity.UserID, event.RoomName, event.Password)
 		if err != nil {
+			if h.attempts != nil && errors.Is(err, app.ErrInvalidRoomCredentials) {
+				h.attempts.attempts.RecordFailure(userAttemptKey(client.identity.UserID), time.Now().UTC())
+			}
 			client.write(eventError(event.RequestID, err))
 			return
+		}
+		if h.attempts != nil {
+			h.attempts.attempts.Reset(userAttemptKey(client.identity.UserID))
 		}
 		history, err := h.messages.History(ctx, room.ID)
 		if err != nil {

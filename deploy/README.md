@@ -116,10 +116,13 @@ POSTGRES_PASSWORD=FIRST_GENERATED_HEX_VALUE
 TERMCHAT_JWT_SECRET=SECOND_GENERATED_HEX_VALUE
 TERMCHAT_TOKEN_TTL=24h
 TERMCHAT_CLEANUP_INTERVAL=1h
+TERMCHAT_TRUST_PROXY_HEADERS=true
 TERMCHAT_IMAGE=termchat-server:local
 ```
 
 Keep both generated secrets stable across updates. Changing the PostgreSQL password without updating the existing database role breaks database access. Changing the JWT secret invalidates all existing sessions.
+
+Keep `TERMCHAT_TRUST_PROXY_HEADERS=true` only when clients reach the bound server port through the trusted Nginx reverse proxy. Set it to `false` if clients can connect directly.
 
 Hex values are required here because the Compose file safely embeds the database password in a PostgreSQL URL.
 

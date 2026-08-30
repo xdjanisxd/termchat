@@ -3,15 +3,17 @@ package config
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 )
 
 type Server struct {
-	ListenAddr      string
-	DatabaseURL     string
-	JWTSecret       []byte
-	TokenTTL        time.Duration
-	CleanupInterval time.Duration
+	ListenAddr        string
+	DatabaseURL       string
+	JWTSecret         []byte
+	TokenTTL          time.Duration
+	CleanupInterval   time.Duration
+	TrustProxyHeaders bool
 }
 
 func LoadServer(getenv func(string) string) (Server, error) {
@@ -30,6 +32,13 @@ func LoadServer(getenv func(string) string) (Server, error) {
 	}
 	if len(config.JWTSecret) < 32 {
 		return Server{}, errors.New("TERMCHAT_JWT_SECRET must contain at least 32 bytes")
+	}
+	if value := getenv("TERMCHAT_TRUST_PROXY_HEADERS"); value != "" {
+		trustProxyHeaders, err := strconv.ParseBool(value)
+		if err != nil {
+			return Server{}, fmt.Errorf("invalid TERMCHAT_TRUST_PROXY_HEADERS %q", value)
+		}
+		config.TrustProxyHeaders = trustProxyHeaders
 	}
 	if value := getenv("TERMCHAT_TOKEN_TTL"); value != "" {
 		duration, err := time.ParseDuration(value)

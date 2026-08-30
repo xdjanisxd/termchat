@@ -13,6 +13,7 @@ import (
 type chatClient struct {
 	conn     *websocket.Conn
 	identity Identity
+	clientIP string
 	writeMu  sync.Mutex
 	roomMu   sync.RWMutex
 	roomID   string

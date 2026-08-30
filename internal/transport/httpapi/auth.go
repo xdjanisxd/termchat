@@ -17,11 +17,16 @@ import (
 const maxRequestBody = 1 << 20
 
 type AuthHandler struct {
-	auth *app.AuthService
+	auth     *app.AuthService
+	attempts *AttemptGuard
 }
 
-func NewAuthHandler(auth *app.AuthService) *AuthHandler {
-	return &AuthHandler{auth: auth}
+func NewAuthHandler(auth *app.AuthService, attempts ...*AttemptGuard) *AuthHandler {
+	handler := &AuthHandler{auth: auth}
+	if len(attempts) > 0 {
+		handler.attempts = attempts[0]
+	}
+	return handler
 }
 
 func (h *AuthHandler) Routes() http.Handler {
@@ -66,11 +71,21 @@ func (h *AuthHandler) login(w http.ResponseWriter, r *http.Request) {
 	result, err := h.auth.Login(r.Context(), request.Username, request.Password, time.Now().UTC())
 	if err != nil {
 		if errors.Is(err, app.ErrInvalidCredentials) {
+			if h.attempts != nil {
+				h.attempts.RecordIPFailure(r, time.Now().UTC())
+			}
 			writeError(w, http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid username or password.")
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "The server could not complete the request.")
 		return
+	}
+	if h.attempts != nil && h.attempts.IsUserBlocked(result.User.ID, time.Now().UTC()) {
+		writeError(w, http.StatusTooManyRequests, "RATE_LIMITED", attemptRateLimitMessage)
+		return
+	}
+	if h.attempts != nil {
+		h.attempts.ResetIP(r)
 	}
 	writeJSON(w, http.StatusOK, result)
 }
