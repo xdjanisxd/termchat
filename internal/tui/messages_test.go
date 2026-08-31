@@ -8,14 +8,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
-	"termchat.local/termchat/internal/client"
 	"termchat.local/termchat/internal/domain"
 )
 
 func TestMessagesDistinguishCurrentUserWithoutRelyingOnColor(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.session.User.ID = "user-1"
 	model.session.User.Username = "alice"
 	model.messages = []domain.Message{
@@ -37,7 +36,7 @@ func TestMessagesDistinguishCurrentUserWithoutRelyingOnColor(t *testing.T) {
 func TestMessagesWrapWithinViewportWidthWithoutLosingContent(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.width = 40
 	model.session.User.ID = "user-1"
 	longRun := strings.Repeat("x", 80)

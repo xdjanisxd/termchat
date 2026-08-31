@@ -3,14 +3,12 @@ package tui
 import (
 	"fmt"
 	"testing"
-
-	"termchat.local/termchat/internal/client"
 )
 
 func TestNewModelUsesAmberCRTThemeForInputs(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 
 	if model.theme.name != "amber-crt" {
 		t.Fatalf("theme name = %q, want amber-crt", model.theme.name)

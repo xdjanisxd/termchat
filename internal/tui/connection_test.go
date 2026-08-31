@@ -3,7 +3,6 @@ package tui
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -17,7 +16,7 @@ import (
 func TestHomeViewShowsOfflineBeforeChatConnection(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenHome
 	model.session.User.Username = "alice"
 
@@ -34,8 +33,7 @@ func TestAuthenticationSuccessShowsConnectingWhileChatConnects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("client.New() error = %v", err)
 	}
-	store := client.NewSessionStore(filepath.Join(t.TempDir(), "session.json"))
-	model := NewModel(api, store)
+	model := NewModel(api)
 	session := client.Session{Token: "token"}
 	session.User.ID = "user-1"
 	session.User.Username = "alice"
@@ -57,7 +55,7 @@ func TestAuthenticationSuccessShowsConnectingWhileChatConnects(t *testing.T) {
 func TestSuccessfulChatConnectionShowsOnlineAcrossViews(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenHome
 	model.session.User.Username = "alice"
 	model.connectionState = connectionConnecting
@@ -79,7 +77,7 @@ func TestSuccessfulChatConnectionShowsOnlineAcrossViews(t *testing.T) {
 func TestFailedChatConnectionReturnsOfflineWithoutRetry(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenHome
 	model.session.User.Username = "alice"
 	model.connectionState = connectionConnecting
@@ -101,7 +99,7 @@ func TestFailedChatConnectionReturnsOfflineWithoutRetry(t *testing.T) {
 func TestLostChatConnectionShowsOfflineWithoutReconnect(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenChat
 	model.session.User.Username = "alice"
 	model.connectionState = connectionOnline
@@ -117,28 +115,6 @@ func TestLostChatConnectionShowsOfflineWithoutReconnect(t *testing.T) {
 	plain := ansi.Strip(model.View())
 	if !strings.Contains(plain, "[OFFLINE] alice") {
 		t.Fatalf("Chat View() missing offline state after disconnect:\n%s", plain)
-	}
-}
-
-func TestSuccessfulSessionRestoreShowsOnline(t *testing.T) {
-	t.Parallel()
-
-	model := NewModel(nil, client.SessionStore{})
-	session := client.Session{Token: "token"}
-	session.User.ID = "user-1"
-	session.User.Username = "alice"
-
-	command := updateModel(t, model, sessionRestoreMsg{session: session})
-
-	if command == nil {
-		t.Fatal("successful session restore did not start event listener")
-	}
-	if model.connectionState != connectionOnline {
-		t.Fatalf("connectionState = %d, want %d", model.connectionState, connectionOnline)
-	}
-	plain := ansi.Strip(model.View())
-	if !strings.Contains(plain, "[ONLINE]") {
-		t.Fatalf("View() missing online state after session restore:\n%s", plain)
 	}
 }
 
@@ -190,7 +166,7 @@ func TestChatHeaderPreservesConnectionStateAtSupportedWidths(t *testing.T) {
 	for _, state := range states {
 		for _, size := range sizes {
 			t.Run(state.name+"/"+size.name, func(t *testing.T) {
-				model := NewModel(nil, client.SessionStore{})
+				model := NewModel(nil)
 				model.connectionState = state.state
 				model.session.User.Username = size.username
 				model.room = &domain.PublicRoom{Name: size.room}

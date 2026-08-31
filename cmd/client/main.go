@@ -38,11 +38,7 @@ func run(ctx context.Context, args []string, getenv func(string) string) error {
 		return fmt.Errorf("configure server: %w", err)
 	}
 	defer api.Disconnect()
-	sessions, err := client.DefaultSessionStore()
-	if err != nil {
-		return fmt.Errorf("configure session storage: %w", err)
-	}
-	model := tui.NewModel(api, sessions)
+	model := tui.NewModel(api)
 	program := tea.NewProgram(model, tea.WithAltScreen(), tea.WithContext(ctx))
 	if _, err := program.Run(); err != nil {
 		return fmt.Errorf("run terminal UI: %w", err)

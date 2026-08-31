@@ -6,7 +6,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"termchat.local/termchat/internal/client"
 	"termchat.local/termchat/internal/domain"
 )
 
@@ -30,7 +29,7 @@ func TestUppercaseKIsNotScrollAlias(t *testing.T) {
 	})
 
 	t.Run("help viewport", func(t *testing.T) {
-		model := NewModel(nil, client.SessionStore{})
+		model := NewModel(nil)
 		model.screen = ScreenHelp
 		updateModel(t, model, tea.WindowSizeMsg{Width: 30, Height: 8})
 		_ = model.View()
@@ -71,7 +70,7 @@ func TestUppercaseJIsNotScrollAlias(t *testing.T) {
 	})
 
 	t.Run("help viewport", func(t *testing.T) {
-		model := NewModel(nil, client.SessionStore{})
+		model := NewModel(nil)
 		model.screen = ScreenHelp
 		updateModel(t, model, tea.WindowSizeMsg{Width: 30, Height: 8})
 		_ = model.View()
@@ -139,7 +138,7 @@ func TestModifiedUppercaseJDoesNotScroll(t *testing.T) {
 }
 
 func newScrollableChatModel() *Model {
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenChat
 	model.session.User.ID = "user-1"
 	model.session.User.Username = "alice"

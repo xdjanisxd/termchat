@@ -118,32 +118,14 @@ While chatting, use `PgUp` and `PgDn` to scroll through message history; the com
 
 Do not append `/v1` or `/v1/ws` to the server URL; the client creates the required API and WebSocket paths automatically.
 
+TermChat keeps its JWT only in the running application's memory. You must log in each time the client starts; closing it discards the token, and no session file needs to be removed.
+
 ## Troubleshooting
 
 If the server cannot be reached, check this endpoint first:
 
 ```text
 https://termchat.osmanela.xyz/healthz
-```
-
-To clear a stale or invalid session:
-
-**Windows PowerShell**
-
-```powershell
-Remove-Item "$env:APPDATA\termchat\session.json" -Force -ErrorAction SilentlyContinue
-```
-
-**Linux**
-
-```bash
-rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/termchat/session.json"
-```
-
-**macOS**
-
-```bash
-rm -f "$HOME/Library/Application Support/termchat/session.json"
 ```
 
 To run the server in your own environment, see the [Docker deployment guide](deploy/README.md).
