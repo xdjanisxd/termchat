@@ -8,14 +8,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-
-	"termchat.local/termchat/internal/client"
 )
 
 func TestHelpCommandOpensDedicatedScreenFromHome(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenHome
 	model.commandInput.SetValue("/help")
 
@@ -29,7 +27,7 @@ func TestHelpCommandOpensDedicatedScreenFromHome(t *testing.T) {
 func TestHelpScreenShowsScannableCommandGroups(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenHelp
 	updateModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
 
@@ -66,7 +64,7 @@ func TestHelpScreenShowsScannableCommandGroups(t *testing.T) {
 func TestHelpScreenScrollsWithinSmallTerminal(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenHelp
 	updateModel(t, model, tea.WindowSizeMsg{Width: 30, Height: 8})
 
@@ -99,7 +97,7 @@ func TestEscapeClosesHelpToPreviousScreen(t *testing.T) {
 
 	for _, start := range []Screen{ScreenHome, ScreenChat} {
 		t.Run(fmt.Sprintf("screen_%d", start), func(t *testing.T) {
-			model := NewModel(nil, client.SessionStore{})
+			model := NewModel(nil)
 			model.screen = start
 			model.commandInput.SetValue("/help")
 			updateModel(t, model, tea.KeyMsg{Type: tea.KeyEnter})

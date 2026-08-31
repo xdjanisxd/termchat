@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
-	"termchat.local/termchat/internal/client"
 	"termchat.local/termchat/internal/domain"
 	"termchat.local/termchat/internal/protocol"
 )
@@ -17,7 +16,7 @@ import (
 func TestChatViewUsesResponsiveContentFirstLayout(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenChat
 	model.session.User.ID = "user-1"
 	model.session.User.Username = "alice"
@@ -53,7 +52,7 @@ func TestChatViewUsesResponsiveContentFirstLayout(t *testing.T) {
 func TestChatViewportScrollsWithoutChangingComposer(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenChat
 	model.session.User.ID = "user-1"
 	model.session.User.Username = "alice"
@@ -84,7 +83,7 @@ func TestChatViewportScrollsWithoutChangingComposer(t *testing.T) {
 func TestChatViewportPageDownDoesNotChangeComposer(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenChat
 	model.session.User.ID = "user-1"
 	model.session.User.Username = "alice"
@@ -113,7 +112,7 @@ func TestChatViewportPageDownDoesNotChangeComposer(t *testing.T) {
 func TestChatViewUsesFallbackWhenTerminalIsTooSmall(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenChat
 	model.session.User.Username = "alice"
 	model.room = &domain.PublicRoom{ID: "room-1", Name: "private_room"}
@@ -138,7 +137,7 @@ func TestChatViewUsesFallbackWhenTerminalIsTooSmall(t *testing.T) {
 func TestNewMessagePreservesManualViewportPosition(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenChat
 	model.session.User.ID = "user-1"
 	model.session.User.Username = "alice"

@@ -2,8 +2,6 @@ package tui
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -18,7 +16,7 @@ import (
 func TestConnectionErrorStatusHasSemanticLabel(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenChat
 	model.session.User.Username = "alice"
 	model.room = &domain.PublicRoom{ID: "room-1", Name: "private_room"}
@@ -35,7 +33,7 @@ func TestConnectionErrorStatusHasSemanticLabel(t *testing.T) {
 func TestRoomJoinedStatusHasSemanticSuccessLabel(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.session.User.Username = "alice"
 	updateModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
 	room := domain.PublicRoom{ID: "room-1", Name: "private_room"}
@@ -51,7 +49,7 @@ func TestRoomJoinedStatusHasSemanticSuccessLabel(t *testing.T) {
 func TestNewStatusReplacesPreviousSemanticLevel(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenChat
 	model.session.User.Username = "alice"
 	model.room = &domain.PublicRoom{ID: "room-1", Name: "private_room"}
@@ -90,7 +88,7 @@ func TestServerEventsAssignSemanticStatusLevels(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			model := NewModel(nil, client.SessionStore{})
+			model := NewModel(nil)
 			model.screen = ScreenChat
 			model.room = &domain.PublicRoom{ID: "room-1", Name: "private_room"}
 			model.setStatus(statusLevel(255), "stale status")
@@ -116,26 +114,7 @@ func TestModelMessagesAssignSemanticStatusLevels(t *testing.T) {
 		wantLevel statusLevel
 		wantText  string
 	}{
-		{
-			name: "session load failed", wantLevel: statusError, wantText: "Could not load saved session: broken store",
-			act: func(t *testing.T, model *Model) {
-				updateModel(t, model, sessionRestoreMsg{loadErr: errors.New("broken store")})
-			},
-		},
-		{
-			name: "restored session connection failed", wantLevel: statusError, wantText: "Session loaded, but chat connection failed: offline",
-			act: func(t *testing.T, model *Model) {
-				session := client.Session{User: domain.PublicUser{ID: "user-1", Username: "alice"}, Token: "token"}
-				updateModel(t, model, sessionRestoreMsg{session: session, connectErr: errors.New("offline")})
-			},
-		},
-		{
-			name: "session restored", wantLevel: statusSuccess, wantText: "Session restored for alice",
-			act: func(t *testing.T, model *Model) {
-				session := client.Session{User: domain.PublicUser{ID: "user-1", Username: "alice"}, Token: "token"}
-				updateModel(t, model, sessionRestoreMsg{session: session})
-			},
-		},
+
 		{
 			name: "connection failed", wantLevel: statusError, wantText: "Chat connection failed: offline",
 			act: func(t *testing.T, model *Model) {
@@ -221,7 +200,7 @@ func TestModelMessagesAssignSemanticStatusLevels(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			model := NewModel(nil, client.SessionStore{})
+			model := NewModel(nil)
 			model.setStatus(statusLevel(255), "stale status")
 
 			test.act(t, model)
@@ -243,8 +222,7 @@ func TestAuthenticationSuccessAssignsSuccessStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("client.New() error = %v", err)
 	}
-	store := client.NewSessionStore(filepath.Join(t.TempDir(), "session.json"))
-	model := NewModel(api, store)
+	model := NewModel(api)
 	model.setStatus(statusLevel(255), "stale status")
 	session := client.Session{User: domain.PublicUser{ID: "user-1", Username: "alice"}, Token: "token"}
 
@@ -258,36 +236,10 @@ func TestAuthenticationSuccessAssignsSuccessStatus(t *testing.T) {
 	}
 }
 
-func TestSessionSaveFailureAssignsErrorStatus(t *testing.T) {
-	t.Parallel()
-
-	api, err := client.New("http://example.test")
-	if err != nil {
-		t.Fatalf("client.New() error = %v", err)
-	}
-	blockedDirectory := filepath.Join(t.TempDir(), "not-a-directory")
-	if err := os.WriteFile(blockedDirectory, []byte("blocked"), 0o600); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-	store := client.NewSessionStore(filepath.Join(blockedDirectory, "session.json"))
-	model := NewModel(api, store)
-	model.setStatus(statusLevel(255), "stale status")
-	session := client.Session{User: domain.PublicUser{ID: "user-1", Username: "alice"}, Token: "token"}
-
-	updateModel(t, model, authResultMsg{session: session})
-
-	if model.statusLevel != statusError {
-		t.Fatalf("statusLevel = %d, want %d", model.statusLevel, statusError)
-	}
-	if !strings.Contains(model.status, "Could not save session:") {
-		t.Fatalf("status = %q, want session save error", model.status)
-	}
-}
-
 func TestOpeningAuthenticationClearsSemanticStatus(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.setStatus(statusError, "stale error")
 
 	updateModel(t, model, keyRunes("l"))
@@ -303,7 +255,7 @@ func TestOpeningAuthenticationClearsSemanticStatus(t *testing.T) {
 func TestAuthenticationViewShowsSemanticStatusLabel(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel(nil, client.SessionStore{})
+	model := NewModel(nil)
 	model.screen = ScreenLogin
 	model.setStatus(statusError, "Invalid username or password.")
 

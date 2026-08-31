@@ -36,12 +36,6 @@ type authResultMsg struct {
 	err     error
 }
 
-type sessionRestoreMsg struct {
-	session    client.Session
-	connectErr error
-	loadErr    error
-}
-
 type connectResultMsg struct {
 	err error
 }
@@ -56,9 +50,8 @@ type serverEventMsg struct {
 }
 
 type Model struct {
-	api      *client.Client
-	sessions client.SessionStore
-	theme    tuiTheme
+	api   *client.Client
+	theme tuiTheme
 
 	screen           Screen
 	session          client.Session
@@ -81,7 +74,7 @@ type Model struct {
 	height           int
 }
 
-func NewModel(api *client.Client, sessions client.SessionStore) *Model {
+func NewModel(api *client.Client) *Model {
 	theme := newAmberCRTTheme()
 
 	username := textinput.New()
@@ -116,23 +109,14 @@ func NewModel(api *client.Client, sessions client.SessionStore) *Model {
 	theme.applyInput(&roomPassword)
 
 	return &Model{
-		api: api, sessions: sessions, theme: theme, screen: ScreenWelcome,
+		api: api, theme: theme, screen: ScreenWelcome,
 		username: username, password: password, commandInput: commandInput,
 		roomPassword: roomPassword, viewport: viewport.New(80, 19), helpViewport: viewport.New(80, 21), width: 80, height: 24,
 	}
 }
 
 func (m *Model) Init() tea.Cmd {
-	return func() tea.Msg {
-		session, err := m.sessions.Load()
-		if err != nil {
-			return sessionRestoreMsg{loadErr: err}
-		}
-		m.api.SetToken(session.Token)
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		return sessionRestoreMsg{session: session, connectErr: m.api.Connect(ctx)}
-	}
+	return nil
 }
 
 func (m *Model) Screen() Screen {
@@ -162,24 +146,6 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncHelpLayout()
 		}
 		return m, nil
-	case sessionRestoreMsg:
-		if msg.loadErr != nil {
-			if !errors.Is(msg.loadErr, client.ErrNoSession) {
-				m.setStatus(statusError, "Could not load saved session: "+msg.loadErr.Error())
-			}
-			return m, nil
-		}
-		m.session = msg.session
-		m.screen = ScreenHome
-		m.focusCommandInput()
-		if msg.connectErr != nil {
-			m.connectionState = connectionOffline
-			m.setStatus(statusError, "Session loaded, but chat connection failed: "+msg.connectErr.Error())
-			return m, nil
-		}
-		m.connectionState = connectionOnline
-		m.setStatus(statusSuccess, "Session restored for "+msg.session.User.Username)
-		return m, m.listenCmd()
 	case connectResultMsg:
 		if msg.err != nil && !errors.Is(msg.err, client.ErrAlreadyConnected) {
 			m.connectionState = connectionOffline
@@ -196,10 +162,6 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.api.SetToken(msg.session.Token)
-		if err := m.sessions.Save(msg.session); err != nil {
-			m.setStatus(statusError, "Could not save session: "+err.Error())
-			return m, nil
-		}
 		m.session = msg.session
 		m.password.SetValue("")
 		m.setStatus(statusSuccess, "Authenticated as "+msg.session.User.Username)

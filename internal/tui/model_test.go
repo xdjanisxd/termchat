@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -18,7 +17,7 @@ import (
 	"termchat.local/termchat/internal/protocol"
 )
 
-func TestModelRegisterFlowPersistsSession(t *testing.T) {
+func TestModelRegisterFlowKeepsSessionInMemory(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -34,8 +33,7 @@ func TestModelRegisterFlowPersistsSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("client.New() error = %v", err)
 	}
-	store := client.NewSessionStore(filepath.Join(t.TempDir(), "session.json"))
-	model := NewModel(api, store)
+	model := NewModel(api)
 
 	updateModel(t, model, keyRunes("r"))
 	if model.Screen() != ScreenRegister {
@@ -56,9 +54,8 @@ func TestModelRegisterFlowPersistsSession(t *testing.T) {
 	if model.Screen() != ScreenHome || model.Session().User.Username != "alice" {
 		t.Fatalf("model after register: screen=%v session=%#v status=%q", model.Screen(), model.Session(), model.Status())
 	}
-	saved, err := store.Load()
-	if err != nil || saved.Token != "jwt-token" {
-		t.Fatalf("saved session = %#v, %v", saved, err)
+	if model.Session().Token != "jwt-token" {
+		t.Fatalf("session token = %q, want jwt-token", model.Session().Token)
 	}
 }
 
@@ -72,7 +69,7 @@ func TestModelShowsAuthenticationError(t *testing.T) {
 	}))
 	defer server.Close()
 	api, _ := client.New(server.URL)
-	model := NewModel(api, client.NewSessionStore(filepath.Join(t.TempDir(), "session.json")))
+	model := NewModel(api)
 	updateModel(t, model, keyRunes("l"))
 	updateModel(t, model, keyRunes("alice"))
 	updateModel(t, model, tea.KeyMsg{Type: tea.KeyTab})
@@ -84,49 +81,16 @@ func TestModelShowsAuthenticationError(t *testing.T) {
 	}
 }
 
-func TestModelRestoresSavedSessionAndConnects(t *testing.T) {
+func TestModelStartsUnauthenticatedWithoutRestoringSession(t *testing.T) {
 	t.Parallel()
 
-	connected := make(chan string, 1)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/ws" {
-			http.NotFound(w, r)
-			return
-		}
-		connected <- r.Header.Get("Authorization")
-		conn, err := websocket.Accept(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer conn.Close(websocket.StatusNormalClosure, "test complete")
-		_, _, _ = conn.Read(r.Context())
-	}))
-	defer server.Close()
-	api, _ := client.New(server.URL)
-	store := client.NewSessionStore(filepath.Join(t.TempDir(), "session.json"))
-	session := client.Session{Token: "saved-token"}
-	session.User.ID = "user-1"
-	session.User.Username = "alice"
-	if err := store.Save(session); err != nil {
-		t.Fatalf("Save() error = %v", err)
-	}
-	model := NewModel(api, store)
+	model := NewModel(nil)
 	command := model.Init()
-	if command == nil {
-		t.Fatal("Init() did not return a session restore command")
+	if command != nil {
+		t.Fatal("Init() returned a session restore command")
 	}
-	updateModel(t, model, command())
-	defer api.Disconnect()
-	if model.Screen() != ScreenHome || model.Session() != session {
-		t.Fatalf("restored screen=%v session=%#v status=%q", model.Screen(), model.Session(), model.Status())
-	}
-	select {
-	case authorization := <-connected:
-		if authorization != "Bearer saved-token" {
-			t.Fatalf("Authorization = %q", authorization)
-		}
-	default:
-		t.Fatal("saved session did not establish a websocket connection")
+	if model.Screen() != ScreenWelcome || model.Session() != (client.Session{}) {
+		t.Fatalf("initial screen=%v session=%#v", model.Screen(), model.Session())
 	}
 }
 
@@ -159,7 +123,7 @@ func TestModelJoinUsesMaskedPasswordPromptAndOpensChat(t *testing.T) {
 	}
 	defer api.Disconnect()
 
-	model := NewModel(api, client.NewSessionStore(filepath.Join(t.TempDir(), "session.json")))
+	model := NewModel(api)
 	model.screen = ScreenHome
 	model.session.Token = "jwt-token"
 	model.session.User.ID = "user-1"
