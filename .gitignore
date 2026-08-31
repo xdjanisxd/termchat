@@ -19,3 +19,7 @@ Thumbs.db
 
 # Hermes project plans
 .hermes/
+
+# etc
+graphify-out/
+AGENTS.md
