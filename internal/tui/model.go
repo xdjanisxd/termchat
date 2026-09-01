@@ -515,11 +515,13 @@ func (m *Model) renderMessages() string {
 		bodyLines := strings.Split(body, "\n")
 		rendered := make([]string, 0, len(bodyLines))
 		for index, bodyLine := range bodyLines {
+			line := bodyLine
 			if index == 0 {
-				rendered = append(rendered, prefix+bodyLine)
-				continue
+				line = prefix + bodyLine
+			} else {
+				line = m.theme.viewport.Render(strings.Repeat(" ", prefixWidth)) + bodyLine
 			}
-			rendered = append(rendered, m.theme.viewport.Render(strings.Repeat(" ", prefixWidth))+bodyLine)
+			rendered = append(rendered, m.theme.viewport.Width(width).Render(line))
 		}
 		lines = append(lines, strings.Join(rendered, "\n"))
 	}

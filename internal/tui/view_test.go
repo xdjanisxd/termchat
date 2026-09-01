@@ -68,6 +68,25 @@ func TestChatViewportKeepsAmberBackgroundAfterRenderingMessages(t *testing.T) {
 	}
 }
 
+func TestRenderedMessageLinesFillTheViewportWidth(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.screen = ScreenChat
+	model.room = &domain.PublicRoom{ID: "room-1", Name: "private_room"}
+	model.messages = []domain.Message{{
+		ID: "message-1", RoomID: "room-1", UserID: "user-2", Username: "bob",
+		Content: "short message", CreatedAt: time.Date(2026, 8, 27, 21, 4, 0, 0, time.Local),
+	}}
+	updateModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	for _, line := range strings.Split(model.renderMessages(), "\n") {
+		if got := lipgloss.Width(line); got != 80 {
+			t.Fatalf("rendered message line width = %d, want viewport width 80", got)
+		}
+	}
+}
+
 func TestChatViewportScrollsWithoutChangingComposer(t *testing.T) {
 	t.Parallel()
 
