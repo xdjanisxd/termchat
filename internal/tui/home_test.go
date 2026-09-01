@@ -33,6 +33,28 @@ func TestHomeViewGuidesUsersToTheirNextRoomAction(t *testing.T) {
 	}
 }
 
+func TestHomeViewPlacesCommandInputAboveFooter(t *testing.T) {
+	t.Parallel()
+
+	const height = 24
+	model := NewModel(nil)
+	model.screen = ScreenHome
+	model.session.User.Username = "alice"
+	updateModel(t, model, tea.WindowSizeMsg{Width: 80, Height: height})
+
+	lines := strings.Split(ansi.Strip(model.View()), "\n")
+	inputLine := -1
+	for index, line := range lines {
+		if strings.Contains(line, "> /join private_room") {
+			inputLine = index
+			break
+		}
+	}
+	if inputLine != height-2 {
+		t.Fatalf("home command input line = %d, want %d (immediately above footer); view:\n%s", inputLine, height-2, strings.Join(lines, "\n"))
+	}
+}
+
 func TestHomeCommandErrorsExplainHowToRecover(t *testing.T) {
 	t.Parallel()
 

@@ -51,6 +51,36 @@ func (m *Model) renderChatView() string {
 	return m.theme.root.Width(width).Height(height).Render(content)
 }
 
+func (m *Model) renderHomeView() string {
+	width, height := m.terminalSize()
+	m.commandInput.Width = maxInt(1, width-4)
+	m.commandInput.Placeholder = "/join private_room"
+
+	contentHeight := maxInt(1, height-chatHeaderHeight-chatComposerHeight-chatFooterHeight)
+	guide := strings.Join([]string{
+		"WELCOME, " + strings.ToUpper(m.session.User.Username),
+		"",
+		m.theme.brand.Render("START HERE"),
+		"1. Join a room you know",
+		m.theme.muted.Render("   /join <room-name>"),
+		"2. Create a new private room",
+		m.theme.muted.Render("   /createroom <room-name> <password>"),
+		"",
+		m.theme.muted.Render("Room names are private; there is no public room list."),
+		"",
+		"Type /help for every command and example.",
+	}, "\n")
+	content := lipgloss.NewStyle().Width(width).Height(contentHeight).Render(guide)
+
+	return m.theme.root.Width(width).Height(height).Render(lipgloss.JoinVertical(
+		lipgloss.Left,
+		m.renderHomeHeader(width),
+		content,
+		m.renderChatComposer(width),
+		m.renderHomeFooter(width),
+	))
+}
+
 func (m *Model) renderSmallTerminalFallback(width, height int) string {
 	lines := []string{
 		m.theme.brand.Render("TERMCHAT"),
@@ -82,6 +112,17 @@ func (m *Model) renderChatHeader(width int) string {
 	return m.theme.header.Width(width).Render(line)
 }
 
+func (m *Model) renderHomeHeader(width int) string {
+	username := m.session.User.Username
+	if username == "" {
+		username = "anonymous"
+	}
+
+	left := m.theme.brand.Render("TERMCHAT") + m.theme.muted.Render(" // ") + m.theme.room.Render("HOME")
+	right := m.renderConnectionBadge() + " " + m.theme.input.Render(username)
+	return m.theme.header.Width(width).Render(joinSidesPreservingRight(left, right, width))
+}
+
 func (m *Model) renderChatComposer(width int) string {
 	contentWidth := maxInt(1, width-2)
 	return m.theme.composer.Width(contentWidth).Render(m.commandInput.View())
@@ -89,6 +130,14 @@ func (m *Model) renderChatComposer(width int) string {
 
 func (m *Model) renderChatFooter(width int) string {
 	hints := "PgUp/PgDn scroll • /help commands • Ctrl+C quit"
+	if m.status == "" {
+		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
+	}
+	return m.theme.footer.Width(width).Render(joinSides(m.renderStatus(), hints, width))
+}
+
+func (m *Model) renderHomeFooter(width int) string {
+	hints := "/help commands • Ctrl+C quit"
 	if m.status == "" {
 		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
 	}

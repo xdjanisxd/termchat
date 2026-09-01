@@ -479,18 +479,7 @@ func (m *Model) View() string {
 		return fmt.Sprintf("%s — %s\n\n%s\n%s\n\nTab: switch field • Enter: submit • Esc: back%s\n",
 			title, action, m.username.View(), m.password.View(), status)
 	case ScreenHome:
-		return fmt.Sprintf("%s\n\nWELCOME, %s  %s\n\n%s\n%s\n%s\n%s\n\n%s\n\n%s\n\n%s%s\n",
-			title,
-			strings.ToUpper(m.session.User.Username),
-			m.renderConnectionBadge(),
-			m.theme.brand.Render("START HERE"),
-			"1. Join a room you know",
-			m.theme.muted.Render("   /join <room-name>"),
-			"2. Create a new private room\n"+m.theme.muted.Render("   /createroom <room-name> <password>"),
-			m.theme.muted.Render("Room names are private; there is no public room list."),
-			"Type /help for every command and example.",
-			m.commandInput.View(),
-			status)
+		return m.renderHomeView()
 	case ScreenRoomPassword:
 		return fmt.Sprintf("%s\n\nJoin room: %s\n\n%s\n\nEnter: join • Esc: cancel%s\n",
 			title, m.pendingRoomName, m.roomPassword.View(), status)
