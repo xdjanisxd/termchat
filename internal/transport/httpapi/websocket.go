@@ -81,7 +81,7 @@ func (h *ChatHandler) handle(client *chatClient, event ClientEvent) {
 			client.write(eventError(event.RequestID, err))
 			return
 		}
-		client.write(ServerEvent{Type: "room_joined", RequestID: event.RequestID, Room: &room, Messages: history})
+		client.write(ServerEvent{Type: "room_joined", RequestID: event.RequestID, Room: &room, Messages: history.Messages, HasMore: history.HasMore})
 		h.hub.join(client, room.ID)
 	case "join_room":
 		room, err := h.rooms.Join(ctx, client.identity.UserID, event.RoomName, event.Password)
@@ -100,8 +100,20 @@ func (h *ChatHandler) handle(client *chatClient, event ClientEvent) {
 			client.write(eventError(event.RequestID, err))
 			return
 		}
-		client.write(ServerEvent{Type: "room_joined", RequestID: event.RequestID, Room: &room, Messages: history})
+		client.write(ServerEvent{Type: "room_joined", RequestID: event.RequestID, Room: &room, Messages: history.Messages, HasMore: history.HasMore})
 		h.hub.join(client, room.ID)
+	case "load_history":
+		roomID := client.room()
+		if roomID == "" {
+			client.write(namedError(event.RequestID, "NOT_IN_ROOM", "Join a room before loading history."))
+			return
+		}
+		page, err := h.messages.HistoryBefore(ctx, roomID, event.BeforeMessageID)
+		if err != nil {
+			client.write(eventError(event.RequestID, err))
+			return
+		}
+		client.write(ServerEvent{Type: "message_history", RequestID: event.RequestID, Messages: page.Messages, HasMore: page.HasMore})
 	case "leave_room":
 		h.hub.leave(client)
 		client.write(ServerEvent{Type: "room_left", RequestID: event.RequestID})

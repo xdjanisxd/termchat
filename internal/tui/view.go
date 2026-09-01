@@ -31,6 +31,10 @@ func (m *Model) syncChatLayout() {
 	m.viewport.SetContent(m.renderMessages())
 	if wasAtBottom {
 		m.viewport.GotoBottom()
+		m.pendingHistoryOffset = 0
+	} else if m.pendingHistoryOffset > 0 {
+		m.viewport.YOffset += m.pendingHistoryOffset
+		m.pendingHistoryOffset = 0
 	}
 }
 

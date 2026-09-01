@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -18,17 +19,53 @@ func (r *fakeMessageRepository) SaveMessage(_ context.Context, message domain.Me
 	return nil
 }
 
-func (r *fakeMessageRepository) RecentMessages(_ context.Context, roomID string, limit int) ([]domain.Message, error) {
+func (r *fakeMessageRepository) MessagesBefore(_ context.Context, roomID, beforeMessageID string, limit int) ([]domain.Message, error) {
 	var found []domain.Message
 	for _, message := range r.messages {
 		if message.RoomID == roomID {
 			found = append(found, message)
 		}
 	}
-	if len(found) > limit {
-		found = found[len(found)-limit:]
+	end := len(found)
+	if beforeMessageID != "" {
+		end = 0
+		for index, message := range found {
+			if message.ID == beforeMessageID {
+				end = index
+				break
+			}
+		}
 	}
-	return found, nil
+	start := end - limit
+	if start < 0 {
+		start = 0
+	}
+	return append([]domain.Message(nil), found[start:end]...), nil
+}
+
+func TestMessageServiceHistoryBeforeReturnsAnOrderedPageAndHasMore(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, time.August, 26, 15, 0, 0, 0, time.UTC)
+	repository := &fakeMessageRepository{}
+	for i := 1; i <= 101; i++ {
+		repository.messages = append(repository.messages, domain.Message{
+			ID: fmt.Sprintf("message-%03d", i), RoomID: "room-1", UserID: "user-1", Username: "alice",
+			Content: fmt.Sprintf("message %d", i), CreatedAt: now.Add(time.Duration(i) * time.Minute), ExpiresAt: now.Add(domain.MessageRetention),
+		})
+	}
+	service := NewMessageService(repository)
+
+	page, err := service.HistoryBefore(context.Background(), "room-1", "message-101")
+	if err != nil {
+		t.Fatalf("HistoryBefore() error = %v", err)
+	}
+	if !page.HasMore || len(page.Messages) != 50 {
+		t.Fatalf("HistoryBefore() page = %#v", page)
+	}
+	if page.Messages[0].ID != "message-051" || page.Messages[len(page.Messages)-1].ID != "message-100" {
+		t.Fatalf("HistoryBefore() messages = %#v", page.Messages)
+	}
 }
 
 func TestMessageServicePersistsMessageWithRetention(t *testing.T) {

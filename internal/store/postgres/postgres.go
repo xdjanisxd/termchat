@@ -115,23 +115,29 @@ func (s *Store) SaveMessage(ctx context.Context, message domain.Message) error {
 	return nil
 }
 
-func (s *Store) RecentMessages(ctx context.Context, roomID string, limit int) ([]domain.Message, error) {
-	if limit < 1 || limit > 50 {
-		limit = 50
+func (s *Store) MessagesBefore(ctx context.Context, roomID, beforeMessageID string, limit int) ([]domain.Message, error) {
+	if limit < 1 || limit > 51 {
+		limit = 51
 	}
 	rows, err := s.db.Query(ctx, `
 		WITH recent_messages AS (
 			SELECT m.id, m.room_id, m.user_id, u.username, m.content, m.created_at, m.expires_at
 			FROM messages m
 			JOIN users u ON u.id = m.user_id
-			WHERE m.room_id = $1 AND m.expires_at > NOW()
+			WHERE m.room_id = $1
+				AND m.expires_at > NOW()
+				AND ($2 = '' OR (m.created_at, m.id) < (
+					SELECT cursor.created_at, cursor.id
+					FROM messages cursor
+					WHERE cursor.room_id = $1 AND cursor.id = NULLIF($2, '')::uuid
+				))
 			ORDER BY m.created_at DESC, m.id DESC
-			LIMIT $2
+			LIMIT $3
 		)
 		SELECT id, room_id, user_id, username, content, created_at, expires_at
 		FROM recent_messages
 		ORDER BY created_at ASC, id ASC
-	`, roomID, limit)
+	`, roomID, beforeMessageID, limit)
 	if err != nil {
 		return nil, mapError(err, "list recent messages")
 	}
@@ -152,6 +158,10 @@ func (s *Store) RecentMessages(ctx context.Context, roomID string, limit int) ([
 		return nil, mapError(err, "read recent messages")
 	}
 	return messages, nil
+}
+
+func (s *Store) RecentMessages(ctx context.Context, roomID string, limit int) ([]domain.Message, error) {
+	return s.MessagesBefore(ctx, roomID, "", limit)
 }
 
 func (s *Store) DeleteExpiredMessages(ctx context.Context, now time.Time) (int64, error) {
