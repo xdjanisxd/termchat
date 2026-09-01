@@ -316,4 +316,4 @@ Do not add `-v` unless the explicit intention is to permanently delete the Postg
 
 ## Public exposure warning
 
-Before exposing TermChat broadly to the internet, add server-side rate limiting for login, registration, and room-password attempts, plus WebSocket heartbeat/reconnect behavior in the client. The current message-send rate limiter does not cover those authentication paths.
+Before exposing TermChat broadly to the internet, verify server-side rate limiting for login, registration, and room-password attempts; monitor WebSocket heartbeat/reconnect failures; and configure the reverse proxy with a WebSocket idle timeout comfortably above the 45-second client heartbeat interval.

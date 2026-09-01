@@ -25,8 +25,8 @@ func TestConnectionErrorStatusHasSemanticLabel(t *testing.T) {
 	updateModel(t, model, serverEventMsg{err: errors.New("offline")})
 
 	plain := ansi.Strip(model.View())
-	if !strings.Contains(plain, "[ERROR] Connection lost: offline") {
-		t.Fatalf("View() missing semantic error status:\n%s", plain)
+	if !strings.Contains(plain, "[WARN] Connection lost: offline Retrying shortly...") {
+		t.Fatalf("View() missing semantic reconnect status:\n%s", plain)
 	}
 }
 
@@ -116,7 +116,7 @@ func TestModelMessagesAssignSemanticStatusLevels(t *testing.T) {
 	}{
 
 		{
-			name: "connection failed", wantLevel: statusError, wantText: "Chat connection failed: offline",
+			name: "connection failed", wantLevel: statusWarning, wantText: "Chat connection failed: offline Retrying shortly...",
 			act: func(t *testing.T, model *Model) {
 				updateModel(t, model, connectResultMsg{err: errors.New("offline")})
 			},
@@ -135,7 +135,7 @@ func TestModelMessagesAssignSemanticStatusLevels(t *testing.T) {
 			},
 		},
 		{
-			name: "event send failed", wantLevel: statusError, wantText: "send failed",
+			name: "event send failed", wantLevel: statusWarning, wantText: "Could not send chat event: send failed Retrying shortly...",
 			act: func(t *testing.T, model *Model) {
 				updateModel(t, model, eventSentMsg{err: errors.New("send failed")})
 			},

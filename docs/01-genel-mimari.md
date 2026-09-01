@@ -40,7 +40,8 @@ flowchart TB
 - Oda oluşturma ve `/join <oda-adı>` akışı
 - Parolayı maskeli TUI alanında girme
 - Son 50 mesajı gösterme, yeni mesajları canlı ekleme ve komutları işleme
-- Bağlantı kesildiğinde kullanıcıyı bilgilendirme; MVP’de otomatik reconnect yoktur
+- Her 45 saniyede uygulama-seviyesi WebSocket heartbeat gönderme; cevap gelmezse yeniden bağlanma
+- Bağlantı kesildiğinde kullanıcıyı bilgilendirme ve son odasına yalnız süreç belleğinde tutulan oda parolasıyla yeniden katılma
 
 ## Çapraz platform prensipleri
 
