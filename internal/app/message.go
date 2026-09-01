@@ -13,13 +13,19 @@ import (
 const (
 	messageRateWindow = 2 * time.Second
 	messageRateLimit  = 5
+	historyPageSize   = 50
 )
 
 var ErrRateLimited = errors.New("message rate limit exceeded")
 
 type MessageRepository interface {
 	SaveMessage(ctx context.Context, message domain.Message) error
-	RecentMessages(ctx context.Context, roomID string, limit int) ([]domain.Message, error)
+	MessagesBefore(ctx context.Context, roomID, beforeMessageID string, limit int) ([]domain.Message, error)
+}
+
+type MessagePage struct {
+	Messages []domain.Message
+	HasMore  bool
 }
 
 type MessageService struct {
@@ -47,8 +53,21 @@ func (s *MessageService) Send(ctx context.Context, roomID, userID, username, con
 	return message, nil
 }
 
-func (s *MessageService) History(ctx context.Context, roomID string) ([]domain.Message, error) {
-	return s.messages.RecentMessages(ctx, roomID, 50)
+func (s *MessageService) History(ctx context.Context, roomID string) (MessagePage, error) {
+	return s.HistoryBefore(ctx, roomID, "")
+}
+
+func (s *MessageService) HistoryBefore(ctx context.Context, roomID, beforeMessageID string) (MessagePage, error) {
+	messages, err := s.messages.MessagesBefore(ctx, roomID, beforeMessageID, historyPageSize+1)
+	if err != nil {
+		return MessagePage{}, err
+	}
+	page := MessagePage{Messages: messages}
+	if len(page.Messages) > historyPageSize {
+		page.HasMore = true
+		page.Messages = page.Messages[1:]
+	}
+	return page, nil
 }
 
 func (s *MessageService) allow(userID string, now time.Time) bool {

@@ -9,7 +9,21 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"termchat.local/termchat/internal/domain"
+	"termchat.local/termchat/internal/protocol"
 )
+
+func TestHistoryPagePrependsOlderMessagesAndUpdatesAvailability(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.messages = []domain.Message{{ID: "message-51"}}
+	model.historyLoading = true
+	model.applyServerEvent(protocol.ServerEvent{Type: "message_history", Messages: []domain.Message{{ID: "message-1"}, {ID: "message-50"}}, HasMore: false})
+
+	if model.historyLoading || model.historyHasMore || len(model.messages) != 3 || model.messages[0].ID != "message-1" || model.messages[2].ID != "message-51" {
+		t.Fatalf("history state = loading:%t hasMore:%t messages:%#v", model.historyLoading, model.historyHasMore, model.messages)
+	}
+}
 
 func TestMessagesDistinguishCurrentUserWithoutRelyingOnColor(t *testing.T) {
 	t.Parallel()

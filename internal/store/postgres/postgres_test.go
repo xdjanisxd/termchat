@@ -144,7 +144,7 @@ func TestStoreRoomOwnerMutations(t *testing.T) {
 	}
 }
 
-func TestStoreSaveAndReadRecentMessages(t *testing.T) {
+func TestStoreSaveAndReadMessagesBefore(t *testing.T) {
 	t.Parallel()
 
 	db, err := pgxmock.NewPool()
@@ -164,16 +164,16 @@ func TestStoreSaveAndReadRecentMessages(t *testing.T) {
 		t.Fatalf("SaveMessage() error = %v", err)
 	}
 
-	db.ExpectQuery("SELECT id, room_id, user_id, username, content, created_at, expires_at FROM recent_messages").
-		WithArgs("room-1", 50).
+	db.ExpectQuery("cursor.id = NULLIF\\(\\$2, ''\\)::uuid").
+		WithArgs("room-1", "message-2", 51).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "room_id", "user_id", "username", "content", "created_at", "expires_at"}).
 			AddRow("message-1", "room-1", "user-1", "alice", "hello", createdAt, expiresAt))
-	messages, err := repository.RecentMessages(context.Background(), "room-1", 50)
+	messages, err := repository.MessagesBefore(context.Background(), "room-1", "message-2", 51)
 	if err != nil {
-		t.Fatalf("RecentMessages() error = %v", err)
+		t.Fatalf("MessagesBefore() error = %v", err)
 	}
 	if len(messages) != 1 || messages[0].Username != "alice" || messages[0].ExpiresAt != expiresAt {
-		t.Fatalf("RecentMessages() = %#v", messages)
+		t.Fatalf("MessagesBefore() = %#v", messages)
 	}
 }
 

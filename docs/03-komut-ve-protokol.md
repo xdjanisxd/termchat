@@ -48,7 +48,9 @@ GET  /healthz
 ```text
 client -- WSS + JWT --> server
 client -- join_room(name, password) --> server
-server -- room_joined(room, last_50_messages) --> client
+server -- room_joined(room, last_50_messages, has_more) --> client
+client -- load_history(before_message_id) --> server (viewport reaches top)
+server -- message_history(previous_50_messages, has_more) --> client
 client -- send_message(content) --> server
 server -- new_message(message) --> room subscribers
 ```
@@ -75,7 +77,9 @@ server -- new_message(message) --> room subscribers
 }
 ```
 
-Ek olaylar: `leave_room`, `create_room`, `change_room_password`, `delete_room`.
+Ek olaylar: `leave_room`, `create_room`, `change_room_password`, `delete_room`, `load_history`.
+
+`load_history` yalnızca istemcinin o anda katıldığı oda için çalışır. `before_message_id`, zaten gösterilen en eski mesajdır; sunucu bu mesajdan daha eski en fazla 50 mesajı kronolojik sırayla döndürür.
 
 ### Sunucu → istemci
 
@@ -84,7 +88,17 @@ Ek olaylar: `leave_room`, `create_room`, `change_room_password`, `delete_room`.
   "type": "room_joined",
   "request_id": "0df4d4eb-5691-478a-a22d-9c7f1cbfed2e",
   "room": {"id": "a UUID", "name": "ekip_1"},
-  "messages": []
+  "messages": [],
+  "has_more": true
+}
+```
+
+```json
+{
+  "type": "message_history",
+  "request_id": "optional request UUID",
+  "messages": [],
+  "has_more": false
 }
 ```
 

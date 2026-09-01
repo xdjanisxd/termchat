@@ -93,7 +93,7 @@ func (r *wsMessageRepository) SaveMessage(_ context.Context, message domain.Mess
 	return nil
 }
 
-func (r *wsMessageRepository) RecentMessages(_ context.Context, roomID string, limit int) ([]domain.Message, error) {
+func (r *wsMessageRepository) MessagesBefore(_ context.Context, roomID, beforeMessageID string, limit int) ([]domain.Message, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	messages := make([]domain.Message, 0, limit)
@@ -102,7 +102,54 @@ func (r *wsMessageRepository) RecentMessages(_ context.Context, roomID string, l
 			messages = append(messages, message)
 		}
 	}
-	return messages, nil
+	end := len(messages)
+	if beforeMessageID != "" {
+		end = 0
+		for index, message := range messages {
+			if message.ID == beforeMessageID {
+				end = index
+				break
+			}
+		}
+	}
+	start := end - limit
+	if start < 0 {
+		start = 0
+	}
+	return append([]domain.Message(nil), messages[start:end]...), nil
+}
+
+func TestChatHandlerLoadsOlderMessageHistoryForTheCurrentRoom(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	hasher := security.NewPasswordHasher(security.Argon2Params{Memory: 8 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32})
+	messageRepository := &wsMessageRepository{}
+	chat := NewChatHandler(app.NewRoomService(newWSRoomRepository(), hasher), app.NewMessageService(messageRepository))
+	tokens := security.NewTokenManager([]byte("01234567890123456789012345678901"), time.Hour)
+	router := chi.NewRouter()
+	router.With(TokenMiddleware(tokens)).Get("/v1/ws", chat.ServeHTTP)
+	server := httptest.NewServer(router)
+	defer server.Close()
+	token, _ := tokens.Issue("owner-1", "alice", time.Now().UTC())
+	conn := dialTestWebSocket(t, ctx, "ws"+strings.TrimPrefix(server.URL, "http")+"/v1/ws", token)
+	defer conn.Close(websocket.StatusNormalClosure, "test complete")
+
+	if err := wsjson.Write(ctx, conn, ClientEvent{Type: "create_room", RequestID: "create-1", RoomName: "private_room", Password: "roompass"}); err != nil {
+		t.Fatalf("create room write: %v", err)
+	}
+	joined := readUntilEvent(t, ctx, conn, "room_joined")
+	for index := 1; index <= 101; index++ {
+		messageRepository.messages = append(messageRepository.messages, domain.Message{ID: fmt.Sprintf("message-%03d", index), RoomID: joined.Room.ID, UserID: "owner-1", Username: "alice", Content: fmt.Sprintf("message %d", index), CreatedAt: time.Unix(int64(index), 0), ExpiresAt: time.Now().Add(time.Hour)})
+	}
+
+	if err := wsjson.Write(ctx, conn, ClientEvent{Type: "load_history", RequestID: "history-1", BeforeMessageID: "message-101"}); err != nil {
+		t.Fatalf("load history write: %v", err)
+	}
+	page := readUntilEvent(t, ctx, conn, "message_history")
+	if page.RequestID != "history-1" || !page.HasMore || len(page.Messages) != 50 || page.Messages[0].ID != "message-051" || page.Messages[49].ID != "message-100" {
+		t.Fatalf("message_history = %#v", page)
+	}
 }
 
 func TestChatHandlerCreatesJoinsAndBroadcasts(t *testing.T) {

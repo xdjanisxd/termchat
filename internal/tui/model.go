@@ -95,6 +95,9 @@ type Model struct {
 	rejoinInFlight       bool
 	room                 *domain.PublicRoom
 	messages             []domain.Message
+	historyLoading       bool
+	historyHasMore       bool
+	pendingHistoryOffset int
 	focus                int
 	status               string
 	statusLevel          statusLevel
@@ -330,6 +333,10 @@ func (m *Model) updateCommandInput(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.screen == ScreenChat && (message.Type == tea.KeyPgUp || message.Type == tea.KeyPgDown) {
 		var command tea.Cmd
 		m.viewport, command = m.viewport.Update(message)
+		if message.Type == tea.KeyPgUp && m.viewport.AtTop() && m.historyHasMore && !m.historyLoading && len(m.messages) > 0 {
+			m.historyLoading = true
+			return m, tea.Batch(command, m.sendEventCmd(protocol.ClientEvent{Type: "load_history", RequestID: uuid.NewString(), BeforeMessageID: m.messages[0].ID}))
+		}
 		return m, command
 	}
 	if message.Type != tea.KeyEnter {
@@ -426,6 +433,7 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 	switch event.Type {
 	case "error":
 		if event.Error != nil {
+			m.historyLoading = false
 			m.pendingRoomPass = ""
 			if m.rejoinInFlight {
 				m.rejoinInFlight = false
@@ -443,6 +451,8 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 		m.rejoinInFlight = false
 		m.room = event.Room
 		m.messages = append([]domain.Message(nil), event.Messages...)
+		m.historyLoading = false
+		m.historyHasMore = event.HasMore
 		if event.Room != nil && m.pendingRoomPass != "" {
 			m.rejoinRoom = roomRejoin{Name: event.Room.Name, Password: m.pendingRoomPass}
 		}
@@ -458,6 +468,10 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 		if event.Message != nil {
 			m.messages = append(m.messages, *event.Message)
 		}
+	case "message_history":
+		m.historyLoading = false
+		m.historyHasMore = event.HasMore
+		m.prependHistory(event.Messages)
 	case "room_left":
 		m.room = nil
 		m.rejoinRoom = roomRejoin{}
@@ -488,6 +502,24 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 		m.setStatus(statusSuccess, "Room password changed.")
 	case "pong":
 		m.setStatus(statusSuccess, "Connected.")
+	}
+}
+
+func (m *Model) prependHistory(messages []domain.Message) {
+	oldHeight := lipgloss.Height(m.renderMessages())
+	seen := make(map[string]struct{}, len(m.messages))
+	for _, message := range m.messages {
+		seen[message.ID] = struct{}{}
+	}
+	older := make([]domain.Message, 0, len(messages))
+	for _, message := range messages {
+		if _, exists := seen[message.ID]; !exists {
+			older = append(older, message)
+		}
+	}
+	m.messages = append(older, m.messages...)
+	if len(older) > 0 {
+		m.pendingHistoryOffset = lipgloss.Height(m.renderMessages()) - oldHeight
 	}
 }
 

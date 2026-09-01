@@ -809,7 +809,35 @@ Bu değerler daha sonra değiştirilebilir.
 
 ---
 
-# 20. Future Features
+# 20. Planlanan Geliştirmeler
+
+## Öncelik: TUI / Kullanıcı Deneyimi
+
+Bir sonraki geliştirme dilimi TUI / kullanıcı deneyimi olacak. Bu dilimde amaç,
+yeni veya geri dönen bir kullanıcının terminal istemcisini açtıktan sonra ne
+yapması gerektiğini açıkça anlayabilmesi ve başarısız işlemlerde uygulanabilir
+geri bildirim alabilmesidir.
+
+### TODO
+
+- [ ] **Daha yönlendirici home ekranı:** `ScreenHome` üzerinde ilk kullanım ve
+  tekrar kullanım için kısa, taranabilir bir yönlendirme göster. Kullanıcıya
+  oda oluşturmak için `/createroom <name> <password>`, mevcut özel odaya
+  katılmak için `/join <name>` ve tüm komutlar için `/help` yolunu açıkça
+  belirt. Bu yönlendirme mevcut CRT amber temasını, küçük terminal boyutlarını
+  ve içerik-odaklı tek panel düzenini korumalı.
+- [ ] **Daha iyi hata mesajları:** Login/register, oda oluşturma, odaya katılma,
+  oda parolası ve WebSocket/bağlantı hatalarını kullanıcı açısından anlaşılır
+  hale getir. Mesajlar teknik HTTP veya protokol ayrıntısı yerine ne olduğunu ve
+  kullanıcının sonraki adımını söylemeli; örneğin hatalı oda parolası için
+  tekrar deneme, rate-limit kilidi için kalan bekleme süresi ve bağlantı hatası
+  için server adresi/ağ kontrolü. Parola, JWT veya diğer hassas değerler hata
+  metninde ya da loglarda asla görünmemeli.
+
+Uygulamaya geçerken ilgili TUI render ve durum geçişleri için regression testleri
+eklenmeli; Windows ve Linux terminal davranışı birlikte doğrulanmalıdır.
+
+## Daha Sonraki Özellikler
 
 MVP tamamlandıktan sonra aşağıdaki özellikler değerlendirilebilir:
 
