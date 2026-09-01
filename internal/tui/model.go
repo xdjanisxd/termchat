@@ -49,29 +49,62 @@ type serverEventMsg struct {
 	err   error
 }
 
+type reconnectMsg struct{}
+
+type heartbeatTickMsg struct {
+	generation uint64
+}
+
+type heartbeatSentMsg struct {
+	requestID string
+	err       error
+}
+
+type heartbeatTimeoutMsg struct {
+	generation uint64
+	requestID  string
+}
+
+type roomRejoin struct {
+	Name     string
+	Password string
+}
+
+const (
+	heartbeatInterval        = 45 * time.Second
+	heartbeatResponseTimeout = 15 * time.Second
+	reconnectMaxDelay        = 30 * time.Second
+)
+
 type Model struct {
 	api   *client.Client
 	theme tuiTheme
 
-	screen           Screen
-	session          client.Session
-	username         textinput.Model
-	password         textinput.Model
-	commandInput     textinput.Model
-	roomPassword     textinput.Model
-	viewport         viewport.Model
-	helpViewport     viewport.Model
-	helpReturnScreen Screen
-	pendingRoomName  string
-	room             *domain.PublicRoom
-	messages         []domain.Message
-	focus            int
-	status           string
-	statusLevel      statusLevel
-	connectionState  connectionState
-	loading          bool
-	width            int
-	height           int
+	screen               Screen
+	session              client.Session
+	username             textinput.Model
+	password             textinput.Model
+	commandInput         textinput.Model
+	roomPassword         textinput.Model
+	viewport             viewport.Model
+	helpViewport         viewport.Model
+	helpReturnScreen     Screen
+	pendingRoomName      string
+	pendingRoomPass      string
+	rejoinRoom           roomRejoin
+	rejoinInFlight       bool
+	room                 *domain.PublicRoom
+	messages             []domain.Message
+	focus                int
+	status               string
+	statusLevel          statusLevel
+	connectionState      connectionState
+	connectionGeneration uint64
+	reconnectAttempts    int
+	pendingHeartbeatID   string
+	loading              bool
+	width                int
+	height               int
 }
 
 func NewModel(api *client.Client) *Model {
@@ -148,13 +181,25 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case connectResultMsg:
 		if msg.err != nil && !errors.Is(msg.err, client.ErrAlreadyConnected) {
-			m.connectionState = connectionOffline
-			m.setStatus(statusError, "Chat connection failed: "+msg.err.Error())
-			return m, nil
+			return m, m.handleConnectionLoss("Chat connection failed: " + msg.err.Error())
 		}
+		wasReconnecting := m.connectionState == connectionReconnecting
 		m.connectionState = connectionOnline
-		m.setStatus(statusSuccess, "Connected as "+m.session.User.Username)
-		return m, m.listenCmd()
+		m.connectionGeneration++
+		m.reconnectAttempts = 0
+		m.pendingHeartbeatID = ""
+		if wasReconnecting {
+			m.setStatus(statusSuccess, "Reconnected as "+m.session.User.Username)
+		} else {
+			m.setStatus(statusSuccess, "Connected as "+m.session.User.Username)
+		}
+		commands := []tea.Cmd{m.listenCmd(), m.scheduleHeartbeat()}
+		if event, ok := m.rejoinEvent(); ok {
+			m.rejoinInFlight = true
+			m.setStatus(statusInfo, "Reconnected. Rejoining "+event.RoomName+"...")
+			commands = append(commands, m.sendEventCmd(event))
+		}
+		return m, tea.Batch(commands...)
 	case authResultMsg:
 		m.loading = false
 		if msg.err != nil {
@@ -171,23 +216,50 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.connectCmd()
 	case eventSentMsg:
 		if msg.err != nil {
-			m.setStatus(statusError, msg.err.Error())
+			return m, m.handleConnectionLoss("Could not send chat event: " + msg.err.Error())
 		}
 		return m, nil
 	case serverEventMsg:
 		if msg.err != nil {
-			m.connectionState = connectionOffline
-			m.setStatus(statusError, "Connection lost: "+msg.err.Error())
-			return m, nil
+			return m, m.handleConnectionLoss("Connection lost: " + msg.err.Error())
+		}
+		if msg.event.Type == "pong" && msg.event.RequestID == m.pendingHeartbeatID {
+			m.pendingHeartbeatID = ""
 		}
 		m.applyServerEvent(msg.event)
 		if m.screen == ScreenChat {
 			m.syncChatLayout()
 		}
 		return m, m.listenCmd()
+	case reconnectMsg:
+		if m.connectionState != connectionReconnecting {
+			return m, nil
+		}
+		m.connectionState = connectionConnecting
+		m.setStatus(statusInfo, "Reconnecting to chat...")
+		return m, m.connectCmd()
+	case heartbeatTickMsg:
+		if m.connectionState != connectionOnline || msg.generation != m.connectionGeneration || m.pendingHeartbeatID != "" {
+			return m, nil
+		}
+		requestID := uuid.NewString()
+		return m, tea.Batch(m.sendHeartbeatCmd(requestID), m.scheduleHeartbeat())
+	case heartbeatSentMsg:
+		if msg.err != nil {
+			return m, m.handleConnectionLoss("Heartbeat failed: " + msg.err.Error())
+		}
+		m.pendingHeartbeatID = msg.requestID
+		return m, m.scheduleHeartbeatTimeout(msg.requestID)
+	case heartbeatTimeoutMsg:
+		if msg.generation == m.connectionGeneration && msg.requestID == m.pendingHeartbeatID {
+			return m, m.handleConnectionLoss("Heartbeat timed out")
+		}
+		return m, nil
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
-			_ = m.api.Disconnect()
+			if m.api != nil {
+				_ = m.api.Disconnect()
+			}
 			return m, tea.Quit
 		}
 		switch m.screen {
@@ -286,6 +358,8 @@ func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 		m.helpViewport.GotoTop()
 		m.syncHelpLayout()
 	case CommandCreateRoom:
+		m.pendingRoomName = command.Args[0]
+		m.pendingRoomPass = command.Args[1]
 		return m, m.sendEventCmd(protocol.ClientEvent{
 			Type: "create_room", RequestID: uuid.NewString(), RoomName: command.Args[0], Password: command.Args[1],
 		})
@@ -308,6 +382,7 @@ func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 	case CommandWho:
 		return m, m.sendEventCmd(protocol.ClientEvent{Type: "who", RequestID: uuid.NewString()})
 	case CommandChangeRoomPassword:
+		m.pendingRoomPass = command.Args[0]
 		return m, m.sendEventCmd(protocol.ClientEvent{
 			Type: "change_room_password", RequestID: uuid.NewString(), NewPassword: command.Args[0],
 		})
@@ -337,6 +412,7 @@ func (m *Model) updateRoomPassword(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		event := protocol.ClientEvent{
 			Type: "join_room", RequestID: uuid.NewString(), RoomName: m.pendingRoomName, Password: password,
 		}
+		m.pendingRoomPass = password
 		m.roomPassword.SetValue("")
 		m.setStatus(statusInfo, "Joining "+m.pendingRoomName+"...")
 		return m, m.sendEventCmd(event)
@@ -350,12 +426,28 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 	switch event.Type {
 	case "error":
 		if event.Error != nil {
+			m.pendingRoomPass = ""
+			if m.rejoinInFlight {
+				m.rejoinInFlight = false
+				m.rejoinRoom = roomRejoin{}
+				m.room = nil
+				m.messages = nil
+				m.screen = ScreenHome
+				m.focusCommandInput()
+				m.setStatus(statusError, "Could not rejoin the last room. Use /join <room-name> to enter it again.")
+				return
+			}
 			m.setStatus(statusError, event.Error.Message)
 		}
 	case "room_joined":
+		m.rejoinInFlight = false
 		m.room = event.Room
 		m.messages = append([]domain.Message(nil), event.Messages...)
+		if event.Room != nil && m.pendingRoomPass != "" {
+			m.rejoinRoom = roomRejoin{Name: event.Room.Name, Password: m.pendingRoomPass}
+		}
 		m.pendingRoomName = ""
+		m.pendingRoomPass = ""
 		m.roomPassword.SetValue("")
 		m.screen = ScreenChat
 		m.focusCommandInput()
@@ -368,12 +460,16 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 		}
 	case "room_left":
 		m.room = nil
+		m.rejoinRoom = roomRejoin{}
+		m.rejoinInFlight = false
 		m.messages = nil
 		m.screen = ScreenHome
 		m.focusCommandInput()
 		m.setStatus(statusSuccess, "Left the room.")
 	case "room_deleted":
 		m.room = nil
+		m.rejoinRoom = roomRejoin{}
+		m.rejoinInFlight = false
 		m.messages = nil
 		m.screen = ScreenHome
 		m.focusCommandInput()
@@ -385,6 +481,10 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 	case "user_left":
 		m.setStatus(statusWarning, event.Username+" left the room.")
 	case "room_password_changed":
+		if m.room != nil && m.pendingRoomPass != "" {
+			m.rejoinRoom = roomRejoin{Name: m.room.Name, Password: m.pendingRoomPass}
+		}
+		m.pendingRoomPass = ""
 		m.setStatus(statusSuccess, "Room password changed.")
 	case "pong":
 		m.setStatus(statusSuccess, "Connected.")
@@ -459,6 +559,63 @@ func (m *Model) listenCmd() tea.Cmd {
 		event, err := m.api.Receive(context.Background())
 		return serverEventMsg{event: event, err: err}
 	}
+}
+
+func (m *Model) handleConnectionLoss(message string) tea.Cmd {
+	if m.connectionState == connectionReconnecting {
+		return nil
+	}
+	if m.api != nil {
+		_ = m.api.Disconnect()
+	}
+	m.pendingHeartbeatID = ""
+	m.connectionState = connectionReconnecting
+	m.reconnectAttempts++
+	m.setStatus(statusWarning, message+" Retrying shortly...")
+	return tea.Tick(reconnectRetryDelay(m.reconnectAttempts), func(time.Time) tea.Msg { return reconnectMsg{} })
+}
+
+func reconnectRetryDelay(attempt int) time.Duration {
+	if attempt < 1 {
+		attempt = 1
+	}
+	delay := time.Second
+	for retry := 1; retry < attempt && delay < reconnectMaxDelay; retry++ {
+		delay *= 2
+	}
+	if delay > reconnectMaxDelay {
+		return reconnectMaxDelay
+	}
+	return delay
+}
+
+func (m *Model) scheduleHeartbeat() tea.Cmd {
+	generation := m.connectionGeneration
+	return tea.Tick(heartbeatInterval, func(time.Time) tea.Msg {
+		return heartbeatTickMsg{generation: generation}
+	})
+}
+
+func (m *Model) scheduleHeartbeatTimeout(requestID string) tea.Cmd {
+	generation := m.connectionGeneration
+	return tea.Tick(heartbeatResponseTimeout, func(time.Time) tea.Msg {
+		return heartbeatTimeoutMsg{generation: generation, requestID: requestID}
+	})
+}
+
+func (m *Model) sendHeartbeatCmd(requestID string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return heartbeatSentMsg{requestID: requestID, err: m.api.Send(ctx, protocol.ClientEvent{Type: "ping", RequestID: requestID})}
+	}
+}
+
+func (m *Model) rejoinEvent() (protocol.ClientEvent, bool) {
+	if m.room == nil || m.rejoinRoom.Name == "" || m.rejoinRoom.Password == "" {
+		return protocol.ClientEvent{}, false
+	}
+	return protocol.ClientEvent{Type: "join_room", RequestID: uuid.NewString(), RoomName: m.rejoinRoom.Name, Password: m.rejoinRoom.Password}, true
 }
 
 func (m *Model) View() string {
