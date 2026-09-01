@@ -47,3 +47,26 @@ func TestAmberCRTMessageCellsUseViewportBackground(t *testing.T) {
 		}
 	}
 }
+
+func TestAmberCRTHomeAndHelpCellsUseViewportBackground(t *testing.T) {
+	t.Parallel()
+
+	theme := newAmberCRTTheme()
+	want := fmt.Sprint(theme.viewport.GetBackground())
+	for name, style := range map[string]struct{ background any }{
+		"root":     {theme.root.GetBackground()},
+		"brand":    {theme.brand.GetBackground()},
+		"room":     {theme.room.GetBackground()},
+		"header":   {theme.header.GetBackground()},
+		"composer": {theme.composer.GetBackground()},
+		"footer":   {theme.footer.GetBackground()},
+		"prompt":   {theme.prompt.GetBackground()},
+		"input":    {theme.input.GetBackground()},
+		"muted":    {theme.muted.GetBackground()},
+		"cursor":   {theme.cursor.GetBackground()},
+	} {
+		if got := fmt.Sprint(style.background); got != want {
+			t.Errorf("%s background = %q, want viewport background %q", name, got, want)
+		}
+	}
+}

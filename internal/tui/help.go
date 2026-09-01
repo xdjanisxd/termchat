@@ -76,6 +76,9 @@ func (m *Model) renderHelpContent(width int) string {
 			lines = append(lines, usage, strings.Join(descriptionLines, "\n"))
 		}
 	}
+	for index, line := range lines {
+		lines[index] = m.theme.viewport.Width(width).Render(line)
+	}
 	return strings.Join(lines, "\n")
 }
 

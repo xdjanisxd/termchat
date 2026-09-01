@@ -61,6 +61,18 @@ func TestHelpScreenShowsScannableCommandGroups(t *testing.T) {
 	}
 }
 
+func TestHelpContentLinesFillTheViewportWidth(t *testing.T) {
+	t.Parallel()
+
+	const width = 80
+	model := NewModel(nil)
+	for _, line := range strings.Split(model.renderHelpContent(width), "\n") {
+		if got := lipgloss.Width(line); got != width {
+			t.Fatalf("rendered help content line width = %d, want viewport width %d", got, width)
+		}
+	}
+}
+
 func TestHelpScreenScrollsWithinSmallTerminal(t *testing.T) {
 	t.Parallel()
 

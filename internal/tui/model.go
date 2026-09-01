@@ -268,7 +268,7 @@ func (m *Model) updateCommandInput(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	parsed, err := ParseInput(m.commandInput.Value())
 	if err != nil {
-		m.setStatus(statusError, err.Error())
+		m.setStatus(statusError, userFacingCommandError(err))
 		return m, nil
 	}
 	if parsed.Kind != CommandJoinRoom {
@@ -299,7 +299,7 @@ func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 		m.setStatus(statusInfo, "Enter the password for "+command.Args[0])
 	case CommandMessage:
 		if m.screen != ScreenChat || m.room == nil {
-			m.setStatus(statusWarning, "Join a room before sending messages.")
+			m.setStatus(statusWarning, "You are not in a room. Join one with /join <room-name>, or create one with /createroom <room-name> <password>.")
 			return m, nil
 		}
 		return m, m.sendEventCmd(protocol.ClientEvent{Type: "send_message", RequestID: uuid.NewString(), Content: command.Args[0]})
@@ -470,27 +470,41 @@ func (m *Model) View() string {
 
 	switch m.screen {
 	case ScreenWelcome:
-		return fmt.Sprintf("%s\n\n[L] Login\n[R] Register\n[Q] Quit%s\n", title, status)
+		return m.renderFullScreen(fmt.Sprintf("%s\n\n[L] Login\n[R] Register\n[Q] Quit%s", title, status))
 	case ScreenLogin, ScreenRegister:
 		action := "Login"
 		if m.screen == ScreenRegister {
 			action = "Register"
 		}
-		return fmt.Sprintf("%s — %s\n\n%s\n%s\n\nTab: switch field • Enter: submit • Esc: back%s\n",
-			title, action, m.username.View(), m.password.View(), status)
+		return m.renderFullScreen(fmt.Sprintf("%s — %s\n\n%s\n%s\n\nTab: switch field • Enter: submit • Esc: back%s",
+			title, action, m.username.View(), m.password.View(), status))
 	case ScreenHome:
-		return fmt.Sprintf("%s\n\nLogged in as: %s  %s\n\n%s\n\n/createroom <name> <password> • /join <name> • /q%s\n",
-			title, m.session.User.Username, m.renderConnectionBadge(), m.commandInput.View(), status)
+		return m.renderHomeView()
 	case ScreenRoomPassword:
-		return fmt.Sprintf("%s\n\nJoin room: %s\n\n%s\n\nEnter: join • Esc: cancel%s\n",
-			title, m.pendingRoomName, m.roomPassword.View(), status)
+		return m.renderFullScreen(fmt.Sprintf("%s\n\nJoin room: %s\n\n%s\n\nEnter: join • Esc: cancel%s",
+			title, m.pendingRoomName, m.roomPassword.View(), status))
 	case ScreenChat:
 		return m.renderChatView()
 	case ScreenHelp:
 		return m.renderHelpView()
 	default:
-		return title + status + "\n"
+		return m.renderFullScreen(title + status)
 	}
+}
+
+func userFacingCommandError(err error) string {
+	if !errors.Is(err, ErrInvalidCommand) {
+		return err.Error()
+	}
+
+	message := strings.TrimPrefix(err.Error(), ErrInvalidCommand.Error()+": ")
+	if strings.HasPrefix(message, "unknown command ") {
+		return strings.ToUpper(message[:1]) + message[1:]
+	}
+	if strings.HasPrefix(message, "/join needs the right arguments.") {
+		return "\"/join\" needs a room name. Try: /join <room-name>"
+	}
+	return strings.ToUpper(message[:1]) + message[1:]
 }
 
 func (m *Model) renderMessages() string {
