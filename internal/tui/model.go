@@ -470,25 +470,25 @@ func (m *Model) View() string {
 
 	switch m.screen {
 	case ScreenWelcome:
-		return fmt.Sprintf("%s\n\n[L] Login\n[R] Register\n[Q] Quit%s\n", title, status)
+		return m.renderFullScreen(fmt.Sprintf("%s\n\n[L] Login\n[R] Register\n[Q] Quit%s", title, status))
 	case ScreenLogin, ScreenRegister:
 		action := "Login"
 		if m.screen == ScreenRegister {
 			action = "Register"
 		}
-		return fmt.Sprintf("%s — %s\n\n%s\n%s\n\nTab: switch field • Enter: submit • Esc: back%s\n",
-			title, action, m.username.View(), m.password.View(), status)
+		return m.renderFullScreen(fmt.Sprintf("%s — %s\n\n%s\n%s\n\nTab: switch field • Enter: submit • Esc: back%s",
+			title, action, m.username.View(), m.password.View(), status))
 	case ScreenHome:
 		return m.renderHomeView()
 	case ScreenRoomPassword:
-		return fmt.Sprintf("%s\n\nJoin room: %s\n\n%s\n\nEnter: join • Esc: cancel%s\n",
-			title, m.pendingRoomName, m.roomPassword.View(), status)
+		return m.renderFullScreen(fmt.Sprintf("%s\n\nJoin room: %s\n\n%s\n\nEnter: join • Esc: cancel%s",
+			title, m.pendingRoomName, m.roomPassword.View(), status))
 	case ScreenChat:
 		return m.renderChatView()
 	case ScreenHelp:
 		return m.renderHelpView()
 	default:
-		return title + status + "\n"
+		return m.renderFullScreen(title + status)
 	}
 }
 

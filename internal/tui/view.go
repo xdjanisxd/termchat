@@ -148,6 +148,15 @@ func (m *Model) terminalSize() (int, int) {
 	return maxInt(1, m.width), maxInt(1, m.height)
 }
 
+func (m *Model) renderFullScreen(content string) string {
+	width, height := m.terminalSize()
+	lines := strings.Split(content, "\n")
+	for index, line := range lines {
+		lines[index] = m.theme.viewport.Width(width).Render(line)
+	}
+	return m.theme.root.Width(width).Height(height).Render(strings.Join(lines, "\n"))
+}
+
 func joinSides(left, right string, width int) string {
 	if width < 1 {
 		return ""

@@ -87,6 +87,24 @@ func TestRenderedMessageLinesFillTheViewportWidth(t *testing.T) {
 	}
 }
 
+func TestNonChatScreenRowsFillTheTerminalWidth(t *testing.T) {
+	t.Parallel()
+
+	const width = 80
+	for _, screen := range []Screen{ScreenWelcome, ScreenLogin, ScreenRegister, ScreenRoomPassword} {
+		model := NewModel(nil)
+		model.screen = screen
+		model.pendingRoomName = "private_room"
+		updateModel(t, model, tea.WindowSizeMsg{Width: width, Height: 24})
+
+		for _, line := range strings.Split(model.View(), "\n") {
+			if got := lipgloss.Width(line); got != width {
+				t.Fatalf("screen %d rendered row width = %d, want terminal width %d", screen, got, width)
+			}
+		}
+	}
+}
+
 func TestChatViewportScrollsWithoutChangingComposer(t *testing.T) {
 	t.Parallel()
 
