@@ -70,7 +70,7 @@ func (m *Model) renderHomeView() string {
 		"",
 		"Type /help for every command and example.",
 	}, "\n")
-	content := lipgloss.NewStyle().Width(width).Height(contentHeight).Render(guide)
+	content := m.theme.viewport.Width(width).Height(contentHeight).Render(guide)
 
 	return m.theme.root.Width(width).Height(height).Render(lipgloss.JoinVertical(
 		lipgloss.Left,
