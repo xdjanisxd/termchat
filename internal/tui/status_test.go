@@ -157,7 +157,7 @@ func TestModelMessagesAssignSemanticStatusLevels(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid command", wantLevel: statusError, wantText: "invalid command: unknown command \"/unknown\"",
+			name: "invalid command", wantLevel: statusError, wantText: "Unknown command \"/unknown\". Type /help to see available commands.",
 			act: func(t *testing.T, model *Model) {
 				model.screen = ScreenChat
 				model.commandInput.SetValue("/unknown")
@@ -165,7 +165,7 @@ func TestModelMessagesAssignSemanticStatusLevels(t *testing.T) {
 			},
 		},
 		{
-			name: "message before room", wantLevel: statusWarning, wantText: "Join a room before sending messages.",
+			name: "message before room", wantLevel: statusWarning, wantText: "You are not in a room. Join one with /join <room-name>, or create one with /createroom <room-name> <password>.",
 			act: func(t *testing.T, model *Model) {
 				model.screen = ScreenHome
 				model.commandInput.SetValue("hello")

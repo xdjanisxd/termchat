@@ -27,36 +27,40 @@ type Command struct {
 	Args []string
 }
 
+type commandDefinition struct {
+	kind     CommandKind
+	argCount int
+	usage    string
+}
+
+var commandDefinitions = map[string]commandDefinition{
+	"/help":       {kind: CommandHelp, usage: "/help"},
+	"/createroom": {kind: CommandCreateRoom, argCount: 2, usage: "/createroom <room-name> <password>"},
+	"/join":       {kind: CommandJoinRoom, argCount: 1, usage: "/join <room-name>"},
+	"/l":          {kind: CommandLeaveRoom, usage: "/l"},
+	"/who":        {kind: CommandWho, usage: "/who"},
+	"/roompasswd": {kind: CommandChangeRoomPassword, argCount: 1, usage: "/roompasswd <new-password>"},
+	"/deleteroom": {kind: CommandDeleteRoom, usage: "/deleteroom"},
+	"/q":          {kind: CommandQuit, usage: "/q"},
+}
+
 func ParseInput(input string) (Command, error) {
 	trimmed := strings.TrimSpace(input)
 	if trimmed == "" {
-		return Command{}, fmt.Errorf("%w: input is empty", ErrInvalidCommand)
+		return Command{}, fmt.Errorf("%w: nothing was entered. Type /help to see available commands", ErrInvalidCommand)
 	}
 	if !strings.HasPrefix(trimmed, "/") {
 		return Command{Kind: CommandMessage, Args: []string{trimmed}}, nil
 	}
 
 	fields := strings.Fields(trimmed)
-	definitions := map[string]struct {
-		kind     CommandKind
-		argCount int
-	}{
-		"/help":       {kind: CommandHelp},
-		"/createroom": {kind: CommandCreateRoom, argCount: 2},
-		"/join":       {kind: CommandJoinRoom, argCount: 1},
-		"/l":          {kind: CommandLeaveRoom},
-		"/who":        {kind: CommandWho},
-		"/roompasswd": {kind: CommandChangeRoomPassword, argCount: 1},
-		"/deleteroom": {kind: CommandDeleteRoom},
-		"/q":          {kind: CommandQuit},
-	}
-	definition, exists := definitions[fields[0]]
+	definition, exists := commandDefinitions[fields[0]]
 	if !exists {
-		return Command{}, fmt.Errorf("%w: unknown command %q", ErrInvalidCommand, fields[0])
+		return Command{}, fmt.Errorf("%w: unknown command %q. Type /help to see available commands.", ErrInvalidCommand, fields[0])
 	}
 	arguments := fields[1:]
 	if len(arguments) != definition.argCount {
-		return Command{}, fmt.Errorf("%w: %s expects %d argument(s)", ErrInvalidCommand, fields[0], definition.argCount)
+		return Command{}, fmt.Errorf("%w: %s needs the right arguments. Try: %s", ErrInvalidCommand, fields[0], definition.usage)
 	}
 	return Command{Kind: definition.kind, Args: arguments}, nil
 }
