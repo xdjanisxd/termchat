@@ -506,7 +506,8 @@ func (m *Model) renderMessages() string {
 			author = "YOU"
 			authorStyle = m.theme.messageSelf
 		}
-		prefix := m.theme.timestamp.Render(message.CreatedAt.Local().Format("15:04")) + "  " + authorStyle.Render(author) + "  "
+		separator := m.theme.viewport.Render("  ")
+		prefix := m.theme.timestamp.Render(message.CreatedAt.Local().Format("15:04")) + separator + authorStyle.Render(author) + separator
 		prefixWidth := lipgloss.Width(prefix)
 		bodyWidth := maxInt(1, width-prefixWidth)
 		body := ansi.Wordwrap(m.theme.messageBody.Render(message.Content), bodyWidth, " ")
@@ -518,7 +519,7 @@ func (m *Model) renderMessages() string {
 				rendered = append(rendered, prefix+bodyLine)
 				continue
 			}
-			rendered = append(rendered, strings.Repeat(" ", prefixWidth)+bodyLine)
+			rendered = append(rendered, m.theme.viewport.Render(strings.Repeat(" ", prefixWidth))+bodyLine)
 		}
 		lines = append(lines, strings.Join(rendered, "\n"))
 	}

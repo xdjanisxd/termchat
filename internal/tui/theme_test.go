@@ -29,3 +29,21 @@ func TestNewModelUsesAmberCRTThemeForInputs(t *testing.T) {
 		t.Fatalf("command cursor color = %q, want %q", got, want)
 	}
 }
+
+func TestAmberCRTMessageCellsUseViewportBackground(t *testing.T) {
+	t.Parallel()
+
+	theme := newAmberCRTTheme()
+	want := fmt.Sprint(theme.viewport.GetBackground())
+	for name, style := range map[string]struct{ background any }{
+		"timestamp":    {theme.timestamp.GetBackground()},
+		"message user": {theme.messageUser.GetBackground()},
+		"message self": {theme.messageSelf.GetBackground()},
+		"message body": {theme.messageBody.GetBackground()},
+		"empty state":  {theme.emptyState.GetBackground()},
+	} {
+		if got := fmt.Sprint(style.background); got != want {
+			t.Errorf("%s background = %q, want viewport background %q", name, got, want)
+		}
+	}
+}

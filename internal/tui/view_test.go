@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -46,6 +47,24 @@ func TestChatViewUsesResponsiveContentFirstLayout(t *testing.T) {
 	}
 	if got := lipgloss.Height(view); got != 24 {
 		t.Fatalf("View() height = %d, want 24", got)
+	}
+}
+
+func TestChatViewportKeepsAmberBackgroundAfterRenderingMessages(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.screen = ScreenChat
+	model.room = &domain.PublicRoom{ID: "room-1", Name: "private_room"}
+	model.messages = []domain.Message{{
+		ID: "message-1", RoomID: "room-1", UserID: "user-2", Username: "bob",
+		Content: "message on the amber background", CreatedAt: time.Date(2026, 8, 27, 21, 4, 0, 0, time.Local),
+	}}
+	updateModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
+	_ = model.View()
+
+	if got, want := fmt.Sprint(model.viewport.Style.GetBackground()), fmt.Sprint(model.theme.root.GetBackground()); got != want {
+		t.Fatalf("viewport background = %q, want root background %q", got, want)
 	}
 }
 
