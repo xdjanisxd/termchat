@@ -8,6 +8,10 @@ flowchart TD
   AUTH --> HOME[Komut ekranı]
   HOME -->|/createroom ad parola| CREATE[Oda oluştur ve otomatik katıl]
   HOME -->|/join oda-adı| PROMPT[Maskeli oda parolası iste]
+  HOME -->|/dm kullanıcı| DIRECT_INVITE[60 sn'lik direct invite]
+  DIRECT_INVITE -->|/accept| DIRECT_CHAT[Ephemeral 1:1 chat]
+  DIRECT_INVITE -->|/decline veya süre dolumu| HOME
+  DIRECT_CHAT -->|/l, ayrılma veya bağlantı kopması| HOME
   PROMPT -->|doğru| CHAT[Sohbet ekranı + son 50 mesaj]
   PROMPT -->|yanlış| HOME
   CREATE --> CHAT
@@ -25,7 +29,10 @@ flowchart TD
 | `/help` | her yer | kullanılabilir komutları gösterir |
 | `/createroom <oda-adı> <oda-parolası>` | ana ekran | oda oluşturur ve kullanıcıyı odaya alır |
 | `/join <oda-adı>` | ana ekran | maskeli parola istemi açar; parolayı terminal geçmişine yazmaz |
-| `/l` | oda | odadan ayrılır, ana ekrana döner |
+| `/dm <kullanıcı-adı>` | ana ekran | online kullanıcıya 60 sn geçerli, kabul gerektiren direct-chat daveti yollar |
+| `/accept` | ana ekran | bekleyen direct-chat davetini kabul eder |
+| `/decline` | ana ekran | bekleyen direct-chat davetini reddeder |
+| `/l` | oda/direct chat | odayı veya aktif ephemeral direct chat'i terk eder |
 | `/who` | oda | o an WebSocket ile bağlı oda kullanıcılarını gösterir |
 | `/roompasswd <yeni-parola>` | oda sahibi | oda parolasını değiştirir |
 | `/deleteroom` | oda sahibi | açık onaydan sonra oda ve mesajlarını siler |
@@ -126,6 +133,27 @@ Ek olaylar: `leave_room`, `create_room`, `change_room_password`, `delete_room`, 
   "message": "Odaya katılım başarısız."
 }
 ```
+
+## Ephemeral direct-chat sözleşmesi
+
+Direct chat oda oluşturmaz ve room/message persistence akışını kullanmaz. Başlatan ve hedef kullanıcı aynı anda online olmalıdır; hedef kabul etmeden mesaj iletimi başlamaz. Bir kullanıcı aynı anda yalnız bir direct invite veya direct chat bağlamında bulunabilir; direct chat sırasında room bağlamına geçmek, önce direct oturumu sonlandırır.
+
+```text
+client A -- direct_invite(target_username) --> server
+server -- direct_invite_received(invite_id, counterpart, expires_at) --> client B
+client B -- direct_invite_accept(invite_id) --> server
+server -- direct_session_started(session_id, counterpart) --> A + B
+client -- send_direct_message(content) --> server
+server -- new_direct_message(message) --> A + B
+client -- leave_direct --> server
+server -- direct_session_ended(reason) --> A + B
+```
+
+Invite'lar 60 saniye sonra sona erer; `direct_invite_declined`, `direct_invite_expired` ve `direct_invite_cancelled` olayları ilgili istemciye gönderilir. Direct mesajlar PostgreSQL'e yazılmaz, REST history endpoint'iyle alınamaz ve sunucunun yeniden başlaması, bağlantının kopması veya bir tarafın ayrılmasıyla bellekten silinir. Mesaj biçimi ve kullanıcı başına 2 saniyede 5 mesaj sınırı room mesajlarıyla aynıdır.
+
+İstemci olayları: `direct_invite` (`target_username`), `direct_invite_accept` (`invite_id`), `direct_invite_decline` (`invite_id`), `send_direct_message` (`content`) ve `leave_direct`.
+
+Sunucu olayları: `direct_invite_sent`, `direct_invite_received`, `direct_invite_declined`, `direct_invite_expired`, `direct_invite_cancelled`, `direct_session_started`, `new_direct_message`, `direct_session_ended`.
 
 ## Güvenlik kuralları
 

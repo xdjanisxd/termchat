@@ -43,14 +43,25 @@ func (s *MessageService) Send(ctx context.Context, roomID, userID, username, con
 	if err != nil {
 		return domain.Message{}, err
 	}
-	if !s.allow(userID, now) {
-		return domain.Message{}, ErrRateLimited
+	if err := s.ValidateAndAllow(userID, content, now); err != nil {
+		return domain.Message{}, err
 	}
 	message.Username = username
 	if err := s.messages.SaveMessage(ctx, message); err != nil {
 		return domain.Message{}, fmt.Errorf("save message: %w", err)
 	}
 	return message, nil
+}
+
+// ValidateAndAllow applies the shared room/direct input and per-user rate policy without storage.
+func (s *MessageService) ValidateAndAllow(userID, content string, now time.Time) error {
+	if _, err := domain.NewMessage("validation-only", userID, content, now); err != nil {
+		return err
+	}
+	if !s.allow(userID, now) {
+		return ErrRateLimited
+	}
+	return nil
 }
 
 func (s *MessageService) History(ctx context.Context, roomID string) (MessagePage, error) {
@@ -73,7 +84,6 @@ func (s *MessageService) HistoryBefore(ctx context.Context, roomID, beforeMessag
 func (s *MessageService) allow(userID string, now time.Time) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	cutoff := now.Add(-messageRateWindow)
 	previous := s.sentAt[userID]
 	kept := previous[:0]

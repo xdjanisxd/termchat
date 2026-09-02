@@ -96,6 +96,10 @@ type Model struct {
 	rejoinRoom           roomRejoin
 	rejoinInFlight       bool
 	room                 *domain.PublicRoom
+	direct               *protocol.DirectIdentity
+	directSessionID      string
+	pendingDirectInvite  string
+	pendingDirectSender  *protocol.DirectIdentity
 	messages             []domain.Message
 	historyLoading       bool
 	historyHasMore       bool
@@ -167,6 +171,17 @@ func (m *Model) Session() client.Session {
 
 func (m *Model) CurrentRoom() *domain.PublicRoom {
 	return m.room
+}
+
+func (m *Model) endDirectLocally(status string) {
+	m.direct = nil
+	m.directSessionID = ""
+	m.messages = nil
+	m.historyHasMore = false
+	m.historyLoading = false
+	m.screen = ScreenHome
+	m.focusCommandInput()
+	m.setStatus(statusInfo, status)
 }
 
 func (m *Model) Status() string {
@@ -335,7 +350,7 @@ func (m *Model) updateCommandInput(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.screen == ScreenChat && (message.Type == tea.KeyPgUp || message.Type == tea.KeyPgDown) {
 		var command tea.Cmd
 		m.viewport, command = m.viewport.Update(message)
-		if message.Type == tea.KeyPgUp && m.viewport.AtTop() && m.historyHasMore && !m.historyLoading && len(m.messages) > 0 {
+		if message.Type == tea.KeyPgUp && m.direct == nil && m.viewport.AtTop() && m.historyHasMore && !m.historyLoading && len(m.messages) > 0 {
 			m.historyLoading = true
 			return m, tea.Batch(command, m.sendEventCmd(protocol.ClientEvent{Type: "load_history", RequestID: uuid.NewString(), BeforeMessageID: m.messages[0].ID}))
 		}
@@ -416,13 +431,41 @@ func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 		m.roomPassword.Focus()
 		m.screen = ScreenRoomPassword
 		m.setStatus(statusInfo, "Enter the password for "+command.Args[0])
+	case CommandDirectMessage:
+		if m.screen != ScreenHome {
+			m.setStatus(statusWarning, "Leave the current chat before starting a direct chat.")
+			return m, nil
+		}
+		return m, m.sendEventCmd(protocol.ClientEvent{Type: "direct_invite", RequestID: uuid.NewString(), TargetUsername: command.Args[0]})
+	case CommandAcceptDirect:
+		if m.pendingDirectInvite == "" {
+			m.setStatus(statusWarning, "There is no direct invitation to accept.")
+			return m, nil
+		}
+		return m, m.sendEventCmd(protocol.ClientEvent{Type: "direct_invite_accept", RequestID: uuid.NewString(), InviteID: m.pendingDirectInvite})
+	case CommandDeclineDirect:
+		if m.pendingDirectInvite == "" {
+			m.setStatus(statusWarning, "There is no direct invitation to decline.")
+			return m, nil
+		}
+		return m, m.sendEventCmd(protocol.ClientEvent{Type: "direct_invite_decline", RequestID: uuid.NewString(), InviteID: m.pendingDirectInvite})
 	case CommandMessage:
-		if m.screen != ScreenChat || m.room == nil {
+		if m.screen != ScreenChat {
+			m.setStatus(statusWarning, "You are not in a room. Join one with /join <room-name>, or create one with /createroom <room-name> <password>.")
+			return m, nil
+		}
+		if m.direct != nil {
+			return m, m.sendEventCmd(protocol.ClientEvent{Type: "send_direct_message", RequestID: uuid.NewString(), Content: command.Args[0]})
+		}
+		if m.room == nil {
 			m.setStatus(statusWarning, "You are not in a room. Join one with /join <room-name>, or create one with /createroom <room-name> <password>.")
 			return m, nil
 		}
 		return m, m.sendEventCmd(protocol.ClientEvent{Type: "send_message", RequestID: uuid.NewString(), Content: command.Args[0]})
 	case CommandLeaveRoom:
+		if m.direct != nil {
+			return m, m.sendEventCmd(protocol.ClientEvent{Type: "leave_direct", RequestID: uuid.NewString()})
+		}
 		return m, m.sendEventCmd(protocol.ClientEvent{Type: "leave_room", RequestID: uuid.NewString()})
 	case CommandWho:
 		return m, m.sendEventCmd(protocol.ClientEvent{Type: "who", RequestID: uuid.NewString()})
@@ -559,6 +602,41 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 		}
 		m.pendingRoomPass = ""
 		m.setStatus(statusSuccess, "Room password changed.")
+	case "direct_invite_received":
+		m.pendingDirectInvite = event.InviteID
+		m.pendingDirectSender = event.Counterpart
+		if event.Counterpart != nil {
+			m.setStatus(statusInfo, "Direct invite from "+event.Counterpart.Username+". Type /accept or /decline.")
+		}
+	case "direct_invite_sent":
+		if event.Counterpart != nil {
+			m.setStatus(statusInfo, "Direct invitation sent to "+event.Counterpart.Username+". It expires in 60 seconds.")
+		}
+	case "direct_invite_declined", "direct_invite_expired", "direct_invite_cancelled":
+		m.pendingDirectInvite = ""
+		m.pendingDirectSender = nil
+		m.setStatus(statusInfo, "The direct invitation is no longer active.")
+	case "direct_session_started":
+		m.pendingDirectInvite = ""
+		m.pendingDirectSender = nil
+		m.room = nil
+		m.rejoinRoom = roomRejoin{}
+		m.direct = event.Counterpart
+		m.directSessionID = event.DirectSessionID
+		m.messages = nil
+		m.historyHasMore = false
+		m.historyLoading = false
+		m.screen = ScreenChat
+		m.focusCommandInput()
+		if event.Counterpart != nil {
+			m.setStatus(statusSuccess, "Direct chat with "+event.Counterpart.Username+" is ephemeral.")
+		}
+	case "new_direct_message":
+		if event.DirectMessage != nil && m.direct != nil {
+			m.messages = append(m.messages, domain.Message{ID: event.DirectMessage.ID, UserID: event.DirectMessage.UserID, Username: event.DirectMessage.Username, Content: event.DirectMessage.Content, CreatedAt: event.DirectMessage.CreatedAt})
+		}
+	case "direct_session_ended":
+		m.endDirectLocally("Direct chat ended: " + event.Reason)
 	case "pong":
 		m.setStatus(statusSuccess, "Connected.")
 	}
@@ -655,6 +733,16 @@ func (m *Model) listenCmd() tea.Cmd {
 func (m *Model) handleConnectionLoss(message string) tea.Cmd {
 	if m.connectionState == connectionReconnecting {
 		return nil
+	}
+	if m.direct != nil {
+		m.direct = nil
+		m.directSessionID = ""
+		m.messages = nil
+		m.historyHasMore = false
+		m.historyLoading = false
+		m.screen = ScreenHome
+		m.focusCommandInput()
+		message += " Direct chat ended and cannot be reconnected."
 	}
 	if m.api != nil {
 		_ = m.api.Disconnect()

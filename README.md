@@ -109,13 +109,17 @@ When the client opens, register a new user or sign in with an existing account. 
 |---|---|
 | `/createroom <room-name> <password>` | Creates a private room |
 | `/join <room-name>` | Joins a room through a masked password prompt |
+| `/dm <username>` | Invites an online user to a consent-based, ephemeral direct chat |
+| `/accept` / `/decline` | Responds to a received direct-chat invitation |
 | `/who` | Shows users currently online in the room |
 | `/l` | Leaves the room |
 | `/help` | Opens the scrollable command reference; press `Esc` to close it |
 | `/theme [theme-name]` | Opens the theme picker (`Tab`/`Shift+Tab` to navigate, `Enter` to apply, `Esc` to cancel) or changes the theme directly; available: `amber-crt`, `green-crt`, `ice-blue`, `synthwave`, `cyberpunk` |
 | `/q` | Closes the application |
 
-While chatting, use `PgUp` and `PgDn` to scroll through message history; the composer and status bar remain visible. The help screen uses the same keys when its command list is taller than the terminal.
+While chatting, use `PgUp` and `PgDn` to scroll through room message history; the composer and status bar remain visible. The help screen uses the same keys when its command list is taller than the terminal.
+
+Direct chats require the recipient's explicit `/accept`. Their messages live only in the two connected clients' memory: they are never written to PostgreSQL, have no history, and disappear immediately when either person leaves or disconnects.
 
 Do not append `/v1` or `/v1/ws` to the server URL; the client creates the required API and WebSocket paths automatically.
 

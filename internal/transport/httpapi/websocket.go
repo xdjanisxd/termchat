@@ -8,9 +8,11 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
+	"github.com/google/uuid"
 
 	"termchat.local/termchat/internal/app"
 	"termchat.local/termchat/internal/domain"
+	"termchat.local/termchat/internal/protocol"
 	"termchat.local/termchat/internal/store"
 )
 
@@ -44,8 +46,9 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.attempts != nil {
 		client.clientIP = h.attempts.clientIP(r)
 	}
+	h.hub.register(client)
 	defer func() {
-		h.hub.leave(client)
+		h.hub.unregister(client)
 		_ = conn.Close(websocket.StatusNormalClosure, "connection closed")
 	}()
 
@@ -129,6 +132,53 @@ func (h *ChatHandler) handle(client *chatClient, event ClientEvent) {
 			return
 		}
 		h.hub.broadcast(roomID, ServerEvent{Type: "new_message", Message: &message})
+	case "direct_invite":
+		invite, recipient, err := h.hub.inviteDirect(client, event.TargetUsername, time.Now().UTC())
+		if err != nil {
+			client.write(directError(event.RequestID, err))
+			return
+		}
+		expiresAt := invite.expiresAt
+		client.write(ServerEvent{Type: "direct_invite_sent", RequestID: event.RequestID, InviteID: invite.id, ExpiresAt: &expiresAt, Counterpart: directIdentity(recipient)})
+		recipient.write(ServerEvent{Type: "direct_invite_received", InviteID: invite.id, ExpiresAt: &expiresAt, Counterpart: directIdentity(client)})
+	case "direct_invite_accept":
+		session, sender, err := h.hub.acceptDirect(client, event.InviteID, time.Now().UTC())
+		if err != nil {
+			client.write(directError(event.RequestID, err))
+			return
+		}
+		client.write(ServerEvent{Type: "direct_session_started", RequestID: event.RequestID, DirectSessionID: session.id, Counterpart: directIdentity(sender)})
+		sender.write(ServerEvent{Type: "direct_session_started", DirectSessionID: session.id, Counterpart: directIdentity(client)})
+	case "direct_invite_decline":
+		sender, err := h.hub.declineDirect(client, event.InviteID)
+		if err != nil {
+			client.write(directError(event.RequestID, err))
+			return
+		}
+		client.write(ServerEvent{Type: "direct_invite_declined", RequestID: event.RequestID, InviteID: event.InviteID})
+		if sender != nil {
+			sender.write(ServerEvent{Type: "direct_invite_declined", InviteID: event.InviteID, Counterpart: directIdentity(client)})
+		}
+	case "send_direct_message":
+		peer, err := h.hub.directPeer(client)
+		if err != nil {
+			client.write(directError(event.RequestID, err))
+			return
+		}
+		now := time.Now().UTC()
+		if err := h.messages.ValidateAndAllow(client.identity.UserID, event.Content, now); err != nil {
+			client.write(eventError(event.RequestID, err))
+			return
+		}
+		message := protocol.DirectMessage{ID: uuid.NewString(), UserID: client.identity.UserID, Username: client.identity.Username, Content: event.Content, CreatedAt: now}
+		client.write(ServerEvent{Type: "new_direct_message", DirectMessage: &message})
+		peer.write(ServerEvent{Type: "new_direct_message", DirectMessage: &message})
+	case "leave_direct":
+		if client.direct() == "" {
+			client.write(directError(event.RequestID, errNotInDirectSession))
+			return
+		}
+		h.hub.endDirect(client, "participant_left")
 	case "who":
 		roomID := client.room()
 		if roomID == "" {
@@ -184,4 +234,23 @@ func eventError(requestID string, err error) ServerEvent {
 
 func namedError(requestID, code, message string) ServerEvent {
 	return ServerEvent{Type: "error", RequestID: requestID, Error: &EventError{Code: code, Message: message}}
+}
+
+func directIdentity(client *chatClient) *protocol.DirectIdentity {
+	return &protocol.DirectIdentity{UserID: client.identity.UserID, Username: client.identity.Username}
+}
+
+func directError(requestID string, err error) ServerEvent {
+	switch {
+	case errors.Is(err, errInvalidDirectTarget):
+		return namedError(requestID, "INVALID_DIRECT_TARGET", "The target must be a different, currently connected username.")
+	case errors.Is(err, errInvalidDirectInvite):
+		return namedError(requestID, "INVALID_DIRECT_INVITE", "This direct invitation is no longer available to you.")
+	case errors.Is(err, errDirectContextBusy):
+		return namedError(requestID, "DIRECT_CONTEXT_BUSY", "One participant is already in a room, direct chat, or pending invitation.")
+	case errors.Is(err, errNotInDirectSession):
+		return namedError(requestID, "NOT_IN_DIRECT_SESSION", "You are not in an active direct chat.")
+	default:
+		return namedError(requestID, "INTERNAL_ERROR", "The server could not complete the direct chat action.")
+	}
 }

@@ -14,6 +14,7 @@ func TestParseInputCommands(t *testing.T) {
 		{input: "/help", kind: CommandHelp},
 		{input: "/createroom private_room roompass", kind: CommandCreateRoom, args: []string{"private_room", "roompass"}},
 		{input: "/join private_room", kind: CommandJoinRoom, args: []string{"private_room"}},
+		{input: "/dm bob", kind: CommandDirectMessage, args: []string{"bob"}},
 		{input: "/l", kind: CommandLeaveRoom},
 		{input: "/who", kind: CommandWho},
 		{input: "/roompasswd new-pass", kind: CommandChangeRoomPassword, args: []string{"new-pass"}},

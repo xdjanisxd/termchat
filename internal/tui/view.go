@@ -70,6 +70,8 @@ func (m *Model) renderHomeView() string {
 		m.theme.muted.Render("   /join <room-name>"),
 		"2. Create a new private room",
 		m.theme.muted.Render("   /createroom <room-name> <password>"),
+		"3. Start a temporary direct chat",
+		m.theme.muted.Render("   /dm <username>"),
 		"",
 		m.theme.muted.Render("Room names are private; there is no public room list."),
 		"",
@@ -102,7 +104,11 @@ func (m *Model) renderSmallTerminalFallback(width, height int) string {
 
 func (m *Model) renderChatHeader(width int) string {
 	roomName := "room"
-	if m.room != nil {
+	prefix := "#"
+	if m.direct != nil {
+		roomName = m.direct.Username
+		prefix = "@"
+	} else if m.room != nil {
 		roomName = m.room.Name
 	}
 	username := m.session.User.Username
@@ -110,7 +116,7 @@ func (m *Model) renderChatHeader(width int) string {
 		username = "anonymous"
 	}
 
-	left := m.theme.brand.Render("TERMCHAT") + m.theme.muted.Render(" // ") + m.theme.room.Render("#"+roomName)
+	left := m.theme.brand.Render("TERMCHAT") + m.theme.muted.Render(" // ") + m.theme.room.Render(prefix+roomName)
 	right := m.renderConnectionBadge() + m.theme.root.Render(" ") + m.theme.input.Render(username)
 	line := joinSidesPreservingRight(left, right, width, m.theme.root)
 	return m.theme.header.Width(width).Render(line)

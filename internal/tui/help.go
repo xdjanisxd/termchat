@@ -31,6 +31,8 @@ var helpSections = []helpSection{
 		{usage: "/join <name>", description: "Join a private room"},
 	}},
 	{title: "CHAT", commands: []helpCommand{
+		{usage: "/dm <username>", description: "Invite an online user to a temporary direct chat"},
+		{usage: "/accept | /decline", description: "Respond to a received direct invite"},
 		{usage: "/who", description: "Show users in the room"},
 		{usage: "/l", description: "Leave the current room"},
 	}},
