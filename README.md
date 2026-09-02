@@ -112,13 +112,14 @@ When the client opens, register a new user or sign in with an existing account. 
 | `/who` | Shows users currently online in the room |
 | `/l` | Leaves the room |
 | `/help` | Opens the scrollable command reference; press `Esc` to close it |
+| `/theme <theme-name>` | Changes the current client theme; available: `amber-crt`, `green-crt`, `ice-blue`, `synthwave`, `cyberpunk` |
 | `/q` | Closes the application |
 
 While chatting, use `PgUp` and `PgDn` to scroll through message history; the composer and status bar remain visible. The help screen uses the same keys when its command list is taller than the terminal.
 
 Do not append `/v1` or `/v1/ws` to the server URL; the client creates the required API and WebSocket paths automatically.
 
-TermChat keeps its JWT only in the running application's memory. You must log in each time the client starts; closing it discards the token, and no session file needs to be removed.
+TermChat keeps its JWT and selected theme only in the running application's memory. The default theme is `amber-crt`; closing the client resets any theme selection. You must log in each time the client starts, and no session file needs to be removed.
 
 ## Troubleshooting
 

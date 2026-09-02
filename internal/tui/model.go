@@ -395,11 +395,27 @@ func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 		})
 	case CommandDeleteRoom:
 		return m, m.sendEventCmd(protocol.ClientEvent{Type: "delete_room", RequestID: uuid.NewString()})
+	case CommandTheme:
+		theme, ok := themeByName(command.Args[0])
+		if !ok {
+			m.setStatus(statusError, "Unknown theme: "+command.Args[0]+". Available: "+strings.Join(themeNames(), ", ")+".")
+			return m, nil
+		}
+		m.applyTheme(theme)
+		m.setStatus(statusSuccess, "Theme changed to "+theme.name+".")
 	case CommandQuit:
 		_ = m.api.Disconnect()
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+func (m *Model) applyTheme(theme tuiTheme) {
+	m.theme = theme
+	theme.applyInput(&m.username)
+	theme.applyInput(&m.password)
+	theme.applyInput(&m.commandInput)
+	theme.applyInput(&m.roomPassword)
 }
 
 func (m *Model) updateRoomPassword(message tea.KeyMsg) (tea.Model, tea.Cmd) {

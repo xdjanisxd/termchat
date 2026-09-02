@@ -2,7 +2,11 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestNewModelUsesAmberCRTThemeForInputs(t *testing.T) {
@@ -27,6 +31,85 @@ func TestNewModelUsesAmberCRTThemeForInputs(t *testing.T) {
 	}
 	if got, want := fmt.Sprint(model.commandInput.Cursor.Style.GetForeground()), fmt.Sprint(model.theme.cursor.GetForeground()); got != want {
 		t.Fatalf("command cursor color = %q, want %q", got, want)
+	}
+}
+
+func TestThemeCommandChangesThemeAndEveryInputForCurrentSession(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.screen = ScreenHome
+	model.commandInput.SetValue("/theme green-crt")
+
+	updateModel(t, model, tea.KeyMsg{Type: tea.KeyEnter})
+
+	if model.theme.name != "green-crt" {
+		t.Fatalf("theme name = %q, want green-crt", model.theme.name)
+	}
+	if model.statusLevel != statusSuccess || model.Status() != "Theme changed to green-crt." {
+		t.Fatalf("theme status = (%v, %q), want success confirmation", model.statusLevel, model.Status())
+	}
+	for name, input := range map[string]*textinput.Model{
+		"username":      &model.username,
+		"password":      &model.password,
+		"command input": &model.commandInput,
+		"room password": &model.roomPassword,
+	} {
+		if got, want := fmt.Sprint(input.PromptStyle.GetForeground()), fmt.Sprint(model.theme.prompt.GetForeground()); got != want {
+			t.Errorf("%s prompt color = %q, want %q", name, got, want)
+		}
+	}
+}
+
+func TestThemeCommandSupportsEveryBuiltInPalette(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"amber-crt", "green-crt", "ice-blue", "synthwave", "cyberpunk"} {
+		t.Run(name, func(t *testing.T) {
+			model := NewModel(nil)
+			model.screen = ScreenHome
+			model.commandInput.SetValue("/theme " + name)
+
+			updateModel(t, model, tea.KeyMsg{Type: tea.KeyEnter})
+
+			if model.theme.name != name {
+				t.Fatalf("theme name = %q, want %q", model.theme.name, name)
+			}
+			wantBackground := fmt.Sprint(model.theme.viewport.GetBackground())
+			for styleName, background := range map[string]any{
+				"root":         model.theme.root.GetBackground(),
+				"header":       model.theme.header.GetBackground(),
+				"composer":     model.theme.composer.GetBackground(),
+				"message body": model.theme.messageBody.GetBackground(),
+				"input":        model.theme.input.GetBackground(),
+			} {
+				if got := fmt.Sprint(background); got != wantBackground {
+					t.Errorf("%s background = %q, want viewport background %q", styleName, got, wantBackground)
+				}
+			}
+		})
+	}
+}
+
+func TestUnknownThemeKeepsCurrentThemeAndListsValidNames(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.screen = ScreenHome
+	model.commandInput.SetValue("/theme unknown")
+
+	updateModel(t, model, tea.KeyMsg{Type: tea.KeyEnter})
+
+	if model.theme.name != "amber-crt" {
+		t.Fatalf("theme name = %q, want unchanged amber-crt", model.theme.name)
+	}
+	if model.statusLevel != statusError {
+		t.Fatalf("status level = %v, want error", model.statusLevel)
+	}
+	for _, text := range []string{"Unknown theme", "amber-crt", "green-crt", "ice-blue", "synthwave", "cyberpunk"} {
+		if !strings.Contains(model.Status(), text) {
+			t.Fatalf("status %q does not contain %q", model.Status(), text)
+		}
 	}
 }
 

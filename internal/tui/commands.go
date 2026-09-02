@@ -17,6 +17,7 @@ const (
 	CommandWho                CommandKind = "who"
 	CommandChangeRoomPassword CommandKind = "change_room_password"
 	CommandDeleteRoom         CommandKind = "delete_room"
+	CommandTheme              CommandKind = "theme"
 	CommandQuit               CommandKind = "quit"
 )
 
@@ -41,6 +42,7 @@ var commandDefinitions = map[string]commandDefinition{
 	"/who":        {kind: CommandWho, usage: "/who"},
 	"/roompasswd": {kind: CommandChangeRoomPassword, argCount: 1, usage: "/roompasswd <new-password>"},
 	"/deleteroom": {kind: CommandDeleteRoom, usage: "/deleteroom"},
+	"/theme":      {kind: CommandTheme, argCount: 1, usage: "/theme <theme-name>"},
 	"/q":          {kind: CommandQuit, usage: "/q"},
 }
 

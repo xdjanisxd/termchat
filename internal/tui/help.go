@@ -40,6 +40,7 @@ var helpSections = []helpSection{
 	}},
 	{title: "APP", commands: []helpCommand{
 		{usage: "/help", description: "Show this screen"},
+		{usage: "/theme <theme-name>", description: strings.Join(themeNames(), ", ")},
 		{usage: "/q", description: "Quit TermChat"},
 	}},
 }
