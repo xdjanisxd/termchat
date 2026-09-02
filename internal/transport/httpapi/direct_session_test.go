@@ -68,6 +68,38 @@ func TestDirectSessionRequiresRecipientConsentAndNeverPersistsMessages(t *testin
 	}
 }
 
+func TestDirectSessionEndsWhenParticipantDisconnects(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	chat, tokens, _ := newDirectTestChat()
+	router := chi.NewRouter()
+	router.With(TokenMiddleware(tokens)).Get("/v1/ws", chat.ServeHTTP)
+	server := httptest.NewServer(router)
+	defer server.Close()
+	websocketURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/ws"
+	aliceToken, _ := tokens.Issue("alice-id", "alice", time.Now().UTC())
+	bobToken, _ := tokens.Issue("bob-id", "bob", time.Now().UTC())
+	alice := dialTestWebSocket(t, ctx, websocketURL, aliceToken)
+	defer alice.Close(websocket.StatusNormalClosure, "test complete")
+	bob := dialTestWebSocket(t, ctx, websocketURL, bobToken)
+
+	mustWriteDirect(t, ctx, alice, ClientEvent{Type: "direct_invite", RequestID: "invite-1", TargetUsername: "bob"})
+	invite := readUntilEvent(t, ctx, bob, "direct_invite_received")
+	readUntilEvent(t, ctx, alice, "direct_invite_sent")
+	mustWriteDirect(t, ctx, bob, ClientEvent{Type: "direct_invite_accept", RequestID: "accept-1", InviteID: invite.InviteID})
+	readUntilEvent(t, ctx, alice, "direct_session_started")
+	readUntilEvent(t, ctx, bob, "direct_session_started")
+
+	if err := bob.Close(websocket.StatusNormalClosure, "disconnect for test"); err != nil {
+		t.Fatalf("close participant: %v", err)
+	}
+	ended := readUntilEvent(t, ctx, alice, "direct_session_ended")
+	if ended.Reason != "connection_lost" {
+		t.Fatalf("direct end reason = %q, want connection_lost", ended.Reason)
+	}
+}
+
 func TestDirectInviteRejectsSelfOfflineAndUnauthorizedAcceptance(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
