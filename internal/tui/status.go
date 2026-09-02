@@ -2,7 +2,9 @@ package tui
 
 import (
 	"strings"
+	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -14,30 +16,34 @@ const (
 	statusWarning
 	statusError
 
-	maxNotifications = 3
+	infoToastDuration    = 4 * time.Second
+	successToastDuration = 4 * time.Second
+	warningToastDuration = 8 * time.Second
+	errorToastDuration   = 12 * time.Second
 )
 
 type notification struct {
-	level statusLevel
-	text  string
+	id        uint64
+	level     statusLevel
+	text      string
+	expiresAt time.Time
 }
 
 func (m *Model) setStatus(level statusLevel, text string) {
 	m.statusLevel = level
 	m.status = text
 	if text == "" {
+		m.activeNotification = notification{}
 		return
 	}
-	m.notifications = append(m.notifications, notification{level: level, text: text})
-	if len(m.notifications) > maxNotifications {
-		m.notifications = m.notifications[len(m.notifications)-maxNotifications:]
-	}
+	m.nextNotificationID++
+	m.activeNotification = notification{id: m.nextNotificationID, level: level, text: text, expiresAt: time.Now().Add(notificationDuration(level))}
 }
 
 func (m *Model) clearStatus() {
 	m.statusLevel = statusInfo
 	m.status = ""
-	m.notifications = nil
+	m.activeNotification = notification{}
 }
 
 func (m *Model) renderStatus() string {
@@ -61,32 +67,57 @@ func (m *Model) renderNotification(note notification) string {
 	return style.Render(label + " " + note.text)
 }
 
-func (m *Model) notificationLines(width int) []string {
-	lines := make([]string, 0, len(m.notifications)+2)
-	if m.pendingDirectInvite != "" && m.pendingDirectSender != nil {
-		lines = append(lines, m.theme.statusWarning.Render("[INVITE] Direct invitation from "+m.pendingDirectSender.Username))
-		lines = append(lines, m.theme.muted.Render("         /accept to join · /decline to refuse"))
-	}
-	for _, note := range m.notifications {
-		lines = append(lines, m.renderNotification(note))
-	}
-	for index := range lines {
-		lines[index] = ansi.Truncate(lines[index], width, "")
-	}
-	return lines
-}
-
+// notificationTrayHeight reserves only the currently-visible, timed toast plus
+// the persistent direct-invite action. The height is released when the toast expires.
 func (m *Model) notificationTrayHeight(width int) int {
-	return len(m.notificationLines(width))
+	height := 0
+	if m.activeNotification.id != 0 {
+		height++
+	}
+	if m.pendingDirectInvite != "" && m.pendingDirectSender != nil {
+		height += 2
+	}
+	return height
 }
 
 func (m *Model) renderNotificationTray(width int) string {
-	lines := m.notificationLines(width)
+	lines := make([]string, 0, m.notificationTrayHeight(width))
+	if m.activeNotification.id != 0 {
+		lines = append(lines, m.renderStatusToast(width))
+	}
+	if m.pendingDirectInvite != "" && m.pendingDirectSender != nil {
+		lines = append(lines,
+			m.theme.statusWarning.Render("[INVITE] Direct invitation from "+m.pendingDirectSender.Username),
+			m.theme.muted.Render("         /accept to join · /decline to refuse"),
+		)
+	}
 	if len(lines) == 0 {
 		return ""
 	}
 	for index := range lines {
-		lines[index] = m.theme.root.Width(width).Render(lines[index])
+		lines[index] = m.theme.root.Width(width).Render(ansi.Truncate(lines[index], width, ""))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (m *Model) renderStatusToast(width int) string {
+	if m.activeNotification.id == 0 || width < 1 {
+		return ""
+	}
+	maxWidth := maxInt(1, width/2)
+	toast := ansi.Truncate(m.renderNotification(m.activeNotification), maxWidth, "…")
+	return lipgloss.NewStyle().Width(width).Align(lipgloss.Right).Render(toast)
+}
+
+func notificationDuration(level statusLevel) time.Duration {
+	switch level {
+	case statusSuccess:
+		return successToastDuration
+	case statusWarning:
+		return warningToastDuration
+	case statusError:
+		return errorToastDuration
+	default:
+		return infoToastDuration
+	}
 }

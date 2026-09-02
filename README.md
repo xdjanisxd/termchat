@@ -121,7 +121,7 @@ While chatting, use `PgUp` and `PgDn` to scroll through room message history; th
 
 Direct chats require the recipient's explicit `/accept`. Their messages live only in the two connected clients' memory: they are never written to PostgreSQL, have no history, and disappear immediately when either person leaves or disconnects.
 
-The client keeps the `[ONLINE]`, `[CONNECTING]`, `[RECONNECTING]`, or `[OFFLINE]` connection badge persistent in the header. Heartbeat `ping`/`pong` traffic is intentionally silent. Recent normal notices are retained in a three-item tray, while an incoming direct invitation stays in a dedicated action banner until you use `/accept` or `/decline`, or the invite expires.
+The client keeps the `[ONLINE]`, `[CONNECTING]`, `[RECONNECTING]`, or `[OFFLINE]` connection badge persistent in the header. Heartbeat `ping`/`pong` traffic is intentionally silent. Normal `[INFO]`, `[OK]`, `[WARN]`, and `[ERROR]` notices appear as a single top-right toast, then disappear automatically; newer normal notices replace the visible toast. An incoming direct invitation stays in a dedicated action banner until you use `/accept` or `/decline`, or the invite expires.
 
 Do not append `/v1` or `/v1/ws` to the server URL; the client creates the required API and WebSocket paths automatically.
 

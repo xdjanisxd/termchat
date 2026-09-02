@@ -159,7 +159,7 @@ Sunucu olayları: `direct_invite_sent`, `direct_invite_received`, `direct_invite
 
 Bağlantı durumu header'da kalıcı `[ONLINE]`, `[CONNECTING]`, `[RECONNECTING]` veya `[OFFLINE]` rozetiyle gösterilir. 45 saniyelik heartbeat'in başarılı `pong` yanıtı kullanıcıya bildirim üretmez; yalnız timeout veya reconnect gibi durum değişiklikleri görünür olur.
 
-Normal `[INFO]`, `[OK]`, `[WARN]` ve `[ERROR]` mesajları üç öğelik bounded notification tray içinde birlikte gösterilir; yeni mesaj önceki okunabilir mesajı tek satırlık footer'dan silmez. `direct_invite_received` ayrı bir `[INVITE]` action banner'ıdır: `/accept`, `/decline` veya invite expiry olana kadar görünür kalır ve normal bildirimler ile heartbeat tarafından ezilemez.
+Normal `[INFO]`, `[OK]`, `[WARN]` ve `[ERROR]` mesajları sağ üstte tek bir timed toast olarak gösterilir ve otomatik kaybolur; yeni normal mesaj görünür toast'ı değiştirir. Süreler: bilgi/başarı 4 saniye, uyarı 8 saniye ve hata 12 saniye. `direct_invite_received` ayrı bir `[INVITE]` action banner'ıdır: `/accept`, `/decline` veya invite expiry olana kadar görünür kalır ve normal toast'lar ile heartbeat tarafından ezilemez.
 
 ## Güvenlik kuralları
 

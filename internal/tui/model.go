@@ -65,6 +65,12 @@ type heartbeatTimeoutMsg struct {
 	requestID  string
 }
 
+type notificationExpiredMsg struct {
+	id uint64
+}
+
+type statusToastTickMsg struct{}
+
 type roomRejoin struct {
 	Name     string
 	Password string
@@ -107,7 +113,8 @@ type Model struct {
 	focus                int
 	status               string
 	statusLevel          statusLevel
-	notifications        []notification
+	activeNotification   notification
+	nextNotificationID   uint64
 	connectionState      connectionState
 	connectionGeneration uint64
 	reconnectAttempts    int
@@ -159,7 +166,7 @@ func NewModel(api *client.Client) *Model {
 }
 
 func (m *Model) Init() tea.Cmd {
-	return nil
+	return m.scheduleStatusToastSweep()
 }
 
 func (m *Model) Screen() Screen {
@@ -276,6 +283,20 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.handleConnectionLoss("Heartbeat timed out")
 		}
 		return m, nil
+	case notificationExpiredMsg:
+		if msg.id == m.activeNotification.id {
+			m.statusLevel = statusInfo
+			m.status = ""
+			m.activeNotification = notification{}
+		}
+		return m, nil
+	case statusToastTickMsg:
+		if !m.activeNotification.expiresAt.IsZero() && !time.Now().Before(m.activeNotification.expiresAt) {
+			m.statusLevel = statusInfo
+			m.status = ""
+			m.activeNotification = notification{}
+		}
+		return m, m.scheduleStatusToastSweep()
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
 			if m.api != nil {
@@ -771,6 +792,12 @@ func (m *Model) scheduleHeartbeat() tea.Cmd {
 	generation := m.connectionGeneration
 	return tea.Tick(heartbeatInterval, func(time.Time) tea.Msg {
 		return heartbeatTickMsg{generation: generation}
+	})
+}
+
+func (m *Model) scheduleStatusToastSweep() tea.Cmd {
+	return tea.Tick(time.Second, func(time.Time) tea.Msg {
+		return statusToastTickMsg{}
 	})
 }
 

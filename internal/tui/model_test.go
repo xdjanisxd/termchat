@@ -86,8 +86,8 @@ func TestModelStartsUnauthenticatedWithoutRestoringSession(t *testing.T) {
 
 	model := NewModel(nil)
 	command := model.Init()
-	if command != nil {
-		t.Fatal("Init() returned a session restore command")
+	if command == nil {
+		t.Fatal("Init() did not start the toast expiry ticker")
 	}
 	if model.Screen() != ScreenWelcome || model.Session() != (client.Session{}) {
 		t.Fatalf("initial screen=%v session=%#v", model.Screen(), model.Session())

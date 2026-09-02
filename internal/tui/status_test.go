@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
@@ -25,7 +26,7 @@ func TestConnectionErrorStatusHasSemanticLabel(t *testing.T) {
 	updateModel(t, model, serverEventMsg{err: errors.New("offline")})
 
 	plain := ansi.Strip(model.View())
-	if !strings.Contains(plain, "[WARN] Connection lost: offline Retrying shortly...") {
+	if !strings.Contains(plain, "[WARN] Connection lost: offline") {
 		t.Fatalf("View() missing semantic reconnect status:\n%s", plain)
 	}
 }
@@ -88,42 +89,60 @@ func TestDirectInviteBannerSurvivesHeartbeatPong(t *testing.T) {
 	}
 }
 
-func TestNotificationTrayKeepsRecentMessagesInsteadOfReplacingThem(t *testing.T) {
+func TestStatusToastUsesUpperRightOverlayAndExpires(t *testing.T) {
 	t.Parallel()
 
 	model := NewModel(nil)
 	model.screen = ScreenHome
 	updateModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 24})
-
-	model.applyServerEvent(protocol.ServerEvent{Type: "user_joined", Username: "bob"})
-	model.applyServerEvent(protocol.ServerEvent{Type: "user_left", Username: "carol"})
+	model.setStatus(statusInfo, "Contacting server...")
 
 	plain := ansi.Strip(model.View())
-	for _, want := range []string{"[INFO] bob joined the room.", "[WARN] carol left the room."} {
-		if !strings.Contains(plain, want) {
-			t.Fatalf("View() is missing queued notification %q:\n%s", want, plain)
-		}
+	lines := strings.Split(plain, "\n")
+	if got := strings.Index(lines[chatHeaderHeight], "[INFO] Contacting server..."); got < 55 {
+		t.Fatalf("toast is not right aligned: offset=%d line=%q", got, lines[chatHeaderHeight])
+	}
+	if got := model.notificationTrayHeight(model.width); got != 1 {
+		t.Fatalf("toast height = %d, want 1", got)
+	}
+
+	updateModel(t, model, notificationExpiredMsg{id: model.activeNotification.id})
+	if strings.Contains(ansi.Strip(model.View()), "[INFO] Contacting server...") {
+		t.Fatal("expired info toast remained visible")
 	}
 }
 
-func TestNotificationTrayKeepsAtMostThreeRecentMessages(t *testing.T) {
+func TestStatusToastTickerExpiresElapsedToast(t *testing.T) {
 	t.Parallel()
 
 	model := NewModel(nil)
 	model.screen = ScreenHome
 	updateModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 24})
-	for _, text := range []string{"first", "second", "third", "fourth"} {
-		model.setStatus(statusInfo, text)
+	model.setStatus(statusSuccess, "Connected as test")
+	model.activeNotification.expiresAt = time.Now().Add(-time.Second)
+
+	command := updateModel(t, model, statusToastTickMsg{})
+	if command == nil {
+		t.Fatal("toast tick did not schedule the next expiry check")
 	}
+	if strings.Contains(ansi.Strip(model.View()), "[OK] Connected as test") {
+		t.Fatal("elapsed success toast remained visible after ticker update")
+	}
+}
+
+func TestStatusToastReplacesEarlierNormalToast(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.screen = ScreenHome
+	updateModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 24})
+	model.setStatus(statusInfo, "Contacting server...")
+	model.setStatus(statusSuccess, "Authenticated as test")
+	model.setStatus(statusSuccess, "Connected as test")
 
 	plain := ansi.Strip(model.View())
-	if strings.Contains(plain, "[INFO] first") {
-		t.Fatalf("View() retained notification beyond bounded tray:\n%s", plain)
-	}
-	for _, want := range []string{"[INFO] second", "[INFO] third", "[INFO] fourth"} {
-		if !strings.Contains(plain, want) {
-			t.Fatalf("View() is missing bounded notification %q:\n%s", want, plain)
-		}
+	if strings.Contains(plain, "Contacting server...") || strings.Contains(plain, "Authenticated as test") || !strings.Contains(plain, "[OK] Connected as test") {
+		t.Fatalf("normal toast was not replaced by the latest status:\n%s", plain)
 	}
 }
 
