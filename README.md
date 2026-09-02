@@ -121,6 +121,8 @@ While chatting, use `PgUp` and `PgDn` to scroll through room message history; th
 
 Direct chats require the recipient's explicit `/accept`. Their messages live only in the two connected clients' memory: they are never written to PostgreSQL, have no history, and disappear immediately when either person leaves or disconnects.
 
+The client keeps the `[ONLINE]`, `[CONNECTING]`, `[RECONNECTING]`, or `[OFFLINE]` connection badge persistent in the header. Heartbeat `ping`/`pong` traffic is intentionally silent. Recent normal notices are retained in a three-item tray, while an incoming direct invitation stays in a dedicated action banner until you use `/accept` or `/decline`, or the invite expires.
+
 Do not append `/v1` or `/v1/ws` to the server URL; the client creates the required API and WebSocket paths automatically.
 
 TermChat keeps its JWT and selected theme only in the running application's memory. The default theme is `amber-crt`; closing the client resets any theme selection. You must log in each time the client starts, and no session file needs to be removed.

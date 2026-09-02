@@ -36,8 +36,8 @@ func TestDirectInviteAcceptanceOpensEphemeralChatAndRendersCounterpart(t *testin
 	model.width, model.height = 80, 24
 
 	model.applyServerEvent(protocol.ServerEvent{Type: "direct_invite_received", InviteID: "invite-1", Counterpart: &protocol.DirectIdentity{UserID: "user-bob", Username: "bob"}})
-	if !strings.Contains(model.Status(), "Direct invite from bob") {
-		t.Fatalf("status = %q", model.Status())
+	if !strings.Contains(ansi.Strip(model.renderNotificationTray(model.width)), "[INVITE] Direct invitation from bob") {
+		t.Fatalf("direct invite banner = %q", ansi.Strip(model.renderNotificationTray(model.width)))
 	}
 	model.applyServerEvent(protocol.ServerEvent{Type: "direct_session_started", DirectSessionID: "session-1", Counterpart: &protocol.DirectIdentity{UserID: "user-bob", Username: "bob"}})
 	model.applyServerEvent(protocol.ServerEvent{Type: "new_direct_message", DirectMessage: &protocol.DirectMessage{ID: "dm-1", UserID: "user-bob", Username: "bob", Content: "not saved", CreatedAt: time.Date(2026, 9, 2, 12, 0, 0, 0, time.Local)}})

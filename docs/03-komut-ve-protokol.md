@@ -155,6 +155,12 @@ Invite'lar 60 saniye sonra sona erer; `direct_invite_declined`, `direct_invite_e
 
 Sunucu olayları: `direct_invite_sent`, `direct_invite_received`, `direct_invite_declined`, `direct_invite_expired`, `direct_invite_cancelled`, `direct_session_started`, `new_direct_message`, `direct_session_ended`.
 
+## İstemci bildirim modeli
+
+Bağlantı durumu header'da kalıcı `[ONLINE]`, `[CONNECTING]`, `[RECONNECTING]` veya `[OFFLINE]` rozetiyle gösterilir. 45 saniyelik heartbeat'in başarılı `pong` yanıtı kullanıcıya bildirim üretmez; yalnız timeout veya reconnect gibi durum değişiklikleri görünür olur.
+
+Normal `[INFO]`, `[OK]`, `[WARN]` ve `[ERROR]` mesajları üç öğelik bounded notification tray içinde birlikte gösterilir; yeni mesaj önceki okunabilir mesajı tek satırlık footer'dan silmez. `direct_invite_received` ayrı bir `[INVITE]` action banner'ıdır: `/accept`, `/decline` veya invite expiry olana kadar görünür kalır ve normal bildirimler ile heartbeat tarafından ezilemez.
+
 ## Güvenlik kuralları
 
 - JWT yalnızca TLS/WSS üzerinden taşınır.

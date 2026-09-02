@@ -18,7 +18,7 @@ const (
 func (m *Model) syncChatLayout() {
 	width, height := m.terminalSize()
 	m.syncThemePicker()
-	viewportHeight := height - chatHeaderHeight - chatComposerHeight - chatFooterHeight - m.themePickerHeight(width)
+	viewportHeight := height - chatHeaderHeight - chatComposerHeight - chatFooterHeight - m.notificationTrayHeight(width) - m.themePickerHeight(width)
 	if viewportHeight < 1 {
 		viewportHeight = 1
 	}
@@ -46,7 +46,11 @@ func (m *Model) renderChatView() string {
 	}
 	m.syncChatLayout()
 
-	sections := []string{m.renderChatHeader(width), m.viewport.View()}
+	sections := []string{m.renderChatHeader(width)}
+	if tray := m.renderNotificationTray(width); tray != "" {
+		sections = append(sections, tray)
+	}
+	sections = append(sections, m.viewport.View())
 	if m.themePickerOpen {
 		sections = append(sections, m.renderThemePicker(width))
 	}
@@ -61,7 +65,7 @@ func (m *Model) renderHomeView() string {
 	m.sizeCommandInput(width)
 	m.commandInput.Placeholder = "/join private_room"
 
-	contentHeight := maxInt(1, height-chatHeaderHeight-chatComposerHeight-chatFooterHeight-m.themePickerHeight(width))
+	contentHeight := maxInt(1, height-chatHeaderHeight-chatComposerHeight-chatFooterHeight-m.notificationTrayHeight(width)-m.themePickerHeight(width))
 	guide := strings.Join([]string{
 		"WELCOME, " + strings.ToUpper(m.session.User.Username),
 		"",
@@ -79,7 +83,11 @@ func (m *Model) renderHomeView() string {
 	}, "\n")
 	content := m.theme.viewport.Width(width).Height(contentHeight).Render(guide)
 
-	sections := []string{m.renderHomeHeader(width), content}
+	sections := []string{m.renderHomeHeader(width)}
+	if tray := m.renderNotificationTray(width); tray != "" {
+		sections = append(sections, tray)
+	}
+	sections = append(sections, content)
 	if m.themePickerOpen {
 		sections = append(sections, m.renderThemePicker(width))
 	}
@@ -194,11 +202,7 @@ func (m *Model) renderChatFooter(width int) string {
 		hints = "Tab next • Enter apply • Esc cancel"
 		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
 	}
-	if m.status == "" {
-		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
-	}
-	renderedHints := m.theme.footer.Render(hints)
-	return m.theme.footer.Width(width).Render(joinSides(m.renderStatus(), renderedHints, width, m.theme.root))
+	return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
 }
 
 func (m *Model) renderHomeFooter(width int) string {
@@ -207,11 +211,7 @@ func (m *Model) renderHomeFooter(width int) string {
 		hints = "Tab next • Enter apply • Esc cancel"
 		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
 	}
-	if m.status == "" {
-		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
-	}
-	renderedHints := m.theme.footer.Render(hints)
-	return m.theme.footer.Width(width).Render(joinSides(m.renderStatus(), renderedHints, width, m.theme.root))
+	return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
 }
 
 func (m *Model) terminalSize() (int, int) {

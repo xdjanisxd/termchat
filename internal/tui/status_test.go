@@ -67,6 +67,66 @@ func TestNewStatusReplacesPreviousSemanticLevel(t *testing.T) {
 	}
 }
 
+func TestDirectInviteBannerSurvivesHeartbeatPong(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.screen = ScreenHome
+	model.session.User.Username = "alice"
+	updateModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
+	invite := protocol.ServerEvent{Type: "direct_invite_received", InviteID: "invite-1", Counterpart: &protocol.DirectIdentity{UserID: "bob-id", Username: "bob"}}
+
+	updateModel(t, model, serverEventMsg{event: invite})
+	updateModel(t, model, serverEventMsg{event: protocol.ServerEvent{Type: "pong", RequestID: "heartbeat-1"}})
+
+	plain := ansi.Strip(model.View())
+	if !strings.Contains(plain, "[INVITE] Direct invitation from bob") || !strings.Contains(plain, "/accept to join · /decline to refuse") {
+		t.Fatalf("View() lost the direct invite action banner after pong:\n%s", plain)
+	}
+	if strings.Contains(plain, "[OK] Connected.") {
+		t.Fatalf("View() surfaced a successful heartbeat as a notification:\n%s", plain)
+	}
+}
+
+func TestNotificationTrayKeepsRecentMessagesInsteadOfReplacingThem(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.screen = ScreenHome
+	updateModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 24})
+
+	model.applyServerEvent(protocol.ServerEvent{Type: "user_joined", Username: "bob"})
+	model.applyServerEvent(protocol.ServerEvent{Type: "user_left", Username: "carol"})
+
+	plain := ansi.Strip(model.View())
+	for _, want := range []string{"[INFO] bob joined the room.", "[WARN] carol left the room."} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("View() is missing queued notification %q:\n%s", want, plain)
+		}
+	}
+}
+
+func TestNotificationTrayKeepsAtMostThreeRecentMessages(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.screen = ScreenHome
+	updateModel(t, model, tea.WindowSizeMsg{Width: 100, Height: 24})
+	for _, text := range []string{"first", "second", "third", "fourth"} {
+		model.setStatus(statusInfo, text)
+	}
+
+	plain := ansi.Strip(model.View())
+	if strings.Contains(plain, "[INFO] first") {
+		t.Fatalf("View() retained notification beyond bounded tray:\n%s", plain)
+	}
+	for _, want := range []string{"[INFO] second", "[INFO] third", "[INFO] fourth"} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("View() is missing bounded notification %q:\n%s", want, plain)
+		}
+	}
+}
+
 func TestServerEventsAssignSemanticStatusLevels(t *testing.T) {
 	t.Parallel()
 
@@ -83,7 +143,6 @@ func TestServerEventsAssignSemanticStatusLevels(t *testing.T) {
 		{name: "user joined", event: protocol.ServerEvent{Type: "user_joined", Username: "bob"}, wantLevel: statusInfo, wantText: "bob joined the room."},
 		{name: "user left", event: protocol.ServerEvent{Type: "user_left", Username: "bob"}, wantLevel: statusWarning, wantText: "bob left the room."},
 		{name: "password changed", event: protocol.ServerEvent{Type: "room_password_changed"}, wantLevel: statusSuccess, wantText: "Room password changed."},
-		{name: "pong", event: protocol.ServerEvent{Type: "pong"}, wantLevel: statusSuccess, wantText: "Connected."},
 	}
 
 	for _, test := range tests {

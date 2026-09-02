@@ -107,6 +107,7 @@ type Model struct {
 	focus                int
 	status               string
 	statusLevel          statusLevel
+	notifications        []notification
 	connectionState      connectionState
 	connectionGeneration uint64
 	reconnectAttempts    int
@@ -605,9 +606,6 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 	case "direct_invite_received":
 		m.pendingDirectInvite = event.InviteID
 		m.pendingDirectSender = event.Counterpart
-		if event.Counterpart != nil {
-			m.setStatus(statusInfo, "Direct invite from "+event.Counterpart.Username+". Type /accept or /decline.")
-		}
 	case "direct_invite_sent":
 		if event.Counterpart != nil {
 			m.setStatus(statusInfo, "Direct invitation sent to "+event.Counterpart.Username+". It expires in 60 seconds.")
@@ -638,7 +636,8 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 	case "direct_session_ended":
 		m.endDirectLocally("Direct chat ended: " + event.Reason)
 	case "pong":
-		m.setStatus(statusSuccess, "Connected.")
+		// A successful heartbeat is reflected by the persistent connection badge.
+		// It must not displace user-visible notifications or required actions.
 	}
 }
 
