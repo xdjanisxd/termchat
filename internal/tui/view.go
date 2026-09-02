@@ -17,7 +17,8 @@ const (
 
 func (m *Model) syncChatLayout() {
 	width, height := m.terminalSize()
-	viewportHeight := height - chatHeaderHeight - chatComposerHeight - chatFooterHeight
+	m.syncThemePicker()
+	viewportHeight := height - chatHeaderHeight - chatComposerHeight - chatFooterHeight - m.themePickerHeight(width)
 	if viewportHeight < 1 {
 		viewportHeight = 1
 	}
@@ -45,22 +46,22 @@ func (m *Model) renderChatView() string {
 	}
 	m.syncChatLayout()
 
-	content := lipgloss.JoinVertical(
-		lipgloss.Left,
-		m.renderChatHeader(width),
-		m.viewport.View(),
-		m.renderChatComposer(width),
-		m.renderChatFooter(width),
-	)
+	sections := []string{m.renderChatHeader(width), m.viewport.View()}
+	if m.themePickerOpen {
+		sections = append(sections, m.renderThemePicker(width))
+	}
+	sections = append(sections, m.renderChatComposer(width), m.renderChatFooter(width))
+	content := lipgloss.JoinVertical(lipgloss.Left, sections...)
 	return m.theme.root.Width(width).Height(height).Render(content)
 }
 
 func (m *Model) renderHomeView() string {
 	width, height := m.terminalSize()
+	m.syncThemePicker()
 	m.sizeCommandInput(width)
 	m.commandInput.Placeholder = "/join private_room"
 
-	contentHeight := maxInt(1, height-chatHeaderHeight-chatComposerHeight-chatFooterHeight)
+	contentHeight := maxInt(1, height-chatHeaderHeight-chatComposerHeight-chatFooterHeight-m.themePickerHeight(width))
 	guide := strings.Join([]string{
 		"WELCOME, " + strings.ToUpper(m.session.User.Username),
 		"",
@@ -76,13 +77,12 @@ func (m *Model) renderHomeView() string {
 	}, "\n")
 	content := m.theme.viewport.Width(width).Height(contentHeight).Render(guide)
 
-	return m.theme.root.Width(width).Height(height).Render(lipgloss.JoinVertical(
-		lipgloss.Left,
-		m.renderHomeHeader(width),
-		content,
-		m.renderChatComposer(width),
-		m.renderHomeFooter(width),
-	))
+	sections := []string{m.renderHomeHeader(width), content}
+	if m.themePickerOpen {
+		sections = append(sections, m.renderThemePicker(width))
+	}
+	sections = append(sections, m.renderChatComposer(width), m.renderHomeFooter(width))
+	return m.theme.root.Width(width).Height(height).Render(lipgloss.JoinVertical(lipgloss.Left, sections...))
 }
 
 func (m *Model) renderSmallTerminalFallback(width, height int) string {
@@ -134,8 +134,60 @@ func (m *Model) renderChatComposer(width int) string {
 	return m.theme.composer.Width(width).Render(content)
 }
 
+func (m *Model) renderThemePicker(width int) string {
+	lines := m.themePickerLines(width)
+	for index := range lines {
+		lines[index] = m.theme.root.Width(width).Render(lines[index])
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) themePickerHeight(width int) int {
+	if !m.themePickerOpen {
+		return 0
+	}
+	return len(m.themePickerLines(width))
+}
+
+func (m *Model) themePickerLines(width int) []string {
+	prefix := m.theme.brand.Render("THEMES ")
+	lines := make([]string, 0, 2)
+	line := prefix
+	for index, name := range themeNames() {
+		label := m.theme.input.Render(" " + name + " ")
+		if name == m.theme.name {
+			label = m.theme.brand.Render("[" + name + "]")
+		}
+		if index == m.themePickerIndex {
+			if name == m.theme.name {
+				label = m.theme.statusSuccess.Render(">[" + name + "]<")
+			} else {
+				label = m.theme.statusSuccess.Render(">" + name + "<")
+			}
+		}
+		separator := ""
+		if lipgloss.Width(line) > 0 {
+			separator = m.theme.muted.Render(" ")
+		}
+		if lipgloss.Width(line)+lipgloss.Width(separator)+lipgloss.Width(label) > width && lipgloss.Width(line) > 0 {
+			lines = append(lines, line)
+			line = label
+			continue
+		}
+		line += separator + label
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	return lines
+}
+
 func (m *Model) renderChatFooter(width int) string {
 	hints := "PgUp/PgDn scroll • /help commands • Ctrl+C quit"
+	if m.themePickerOpen {
+		hints = "Tab next • Enter apply • Esc cancel"
+		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
+	}
 	if m.status == "" {
 		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
 	}
@@ -145,6 +197,10 @@ func (m *Model) renderChatFooter(width int) string {
 
 func (m *Model) renderHomeFooter(width int) string {
 	hints := "/help commands • Ctrl+C quit"
+	if m.themePickerOpen {
+		hints = "Tab next • Enter apply • Esc cancel"
+		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
+	}
 	if m.status == "" {
 		return m.theme.footer.Width(width).Render(ansi.Truncate(hints, width, ""))
 	}

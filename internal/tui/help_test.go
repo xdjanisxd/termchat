@@ -46,7 +46,7 @@ func TestHelpScreenShowsScannableCommandGroups(t *testing.T) {
 		"/deleteroom",
 		"APP",
 		"/help",
-		"/theme <theme-name>",
+		"/theme [theme-name]",
 		"amber-crt",
 		"green-crt",
 		"ice-blue",

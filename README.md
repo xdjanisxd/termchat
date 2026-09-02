@@ -112,7 +112,7 @@ When the client opens, register a new user or sign in with an existing account. 
 | `/who` | Shows users currently online in the room |
 | `/l` | Leaves the room |
 | `/help` | Opens the scrollable command reference; press `Esc` to close it |
-| `/theme <theme-name>` | Changes the current client theme; available: `amber-crt`, `green-crt`, `ice-blue`, `synthwave`, `cyberpunk` |
+| `/theme [theme-name]` | Opens the theme picker (`Tab`/`Shift+Tab` to navigate, `Enter` to apply, `Esc` to cancel) or changes the theme directly; available: `amber-crt`, `green-crt`, `ice-blue`, `synthwave`, `cyberpunk` |
 | `/q` | Closes the application |
 
 While chatting, use `PgUp` and `PgDn` to scroll through message history; the composer and status bar remain visible. The help screen uses the same keys when its command list is taller than the terminal.

@@ -29,9 +29,10 @@ type Command struct {
 }
 
 type commandDefinition struct {
-	kind     CommandKind
-	argCount int
-	usage    string
+	kind        CommandKind
+	argCount    int
+	optionalArg bool
+	usage       string
 }
 
 var commandDefinitions = map[string]commandDefinition{
@@ -42,7 +43,7 @@ var commandDefinitions = map[string]commandDefinition{
 	"/who":        {kind: CommandWho, usage: "/who"},
 	"/roompasswd": {kind: CommandChangeRoomPassword, argCount: 1, usage: "/roompasswd <new-password>"},
 	"/deleteroom": {kind: CommandDeleteRoom, usage: "/deleteroom"},
-	"/theme":      {kind: CommandTheme, argCount: 1, usage: "/theme <theme-name>"},
+	"/theme":      {kind: CommandTheme, argCount: 1, optionalArg: true, usage: "/theme [theme-name]"},
 	"/q":          {kind: CommandQuit, usage: "/q"},
 }
 
@@ -61,7 +62,7 @@ func ParseInput(input string) (Command, error) {
 		return Command{}, fmt.Errorf("%w: unknown command %q. Type /help to see available commands.", ErrInvalidCommand, fields[0])
 	}
 	arguments := fields[1:]
-	if len(arguments) != definition.argCount {
+	if len(arguments) != definition.argCount && !(definition.optionalArg && len(arguments) == 0) {
 		return Command{}, fmt.Errorf("%w: %s needs the right arguments. Try: %s", ErrInvalidCommand, fields[0], definition.usage)
 	}
 	return Command{Kind: definition.kind, Args: arguments}, nil
