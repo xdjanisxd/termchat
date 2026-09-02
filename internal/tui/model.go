@@ -85,6 +85,8 @@ type Model struct {
 	username             textinput.Model
 	password             textinput.Model
 	commandInput         textinput.Model
+	themePickerOpen      bool
+	themePickerIndex     int
 	roomPassword         textinput.Model
 	viewport             viewport.Model
 	helpViewport         viewport.Model
@@ -339,9 +341,28 @@ func (m *Model) updateCommandInput(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, command
 	}
+	m.syncThemePicker()
+	if m.themePickerOpen {
+		switch message.Type {
+		case tea.KeyTab:
+			m.themePickerIndex = (m.themePickerIndex + 1) % len(themeNames())
+			return m, nil
+		case tea.KeyShiftTab:
+			m.themePickerIndex = (m.themePickerIndex - 1 + len(themeNames())) % len(themeNames())
+			return m, nil
+		case tea.KeyEsc:
+			m.commandInput.SetValue("")
+			m.syncThemePicker()
+			return m, nil
+		case tea.KeyEnter:
+			m.commandInput.SetValue("/theme " + themeNames()[m.themePickerIndex])
+			m.syncThemePicker()
+		}
+	}
 	if message.Type != tea.KeyEnter {
 		var command tea.Cmd
 		m.commandInput, command = m.commandInput.Update(message)
+		m.syncThemePicker()
 		return m, command
 	}
 
@@ -354,6 +375,23 @@ func (m *Model) updateCommandInput(message tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.commandInput.SetValue("")
 	}
 	return m.dispatchCommand(parsed)
+}
+
+func (m *Model) syncThemePicker() {
+	shouldOpen := strings.TrimSpace(m.commandInput.Value()) == "/theme"
+	if shouldOpen && !m.themePickerOpen {
+		m.themePickerIndex = themeIndex(m.theme.name)
+	}
+	m.themePickerOpen = shouldOpen
+}
+
+func themeIndex(name string) int {
+	for index, candidate := range themeNames() {
+		if candidate == name {
+			return index
+		}
+	}
+	return 0
 }
 
 func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
@@ -396,6 +434,11 @@ func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 	case CommandDeleteRoom:
 		return m, m.sendEventCmd(protocol.ClientEvent{Type: "delete_room", RequestID: uuid.NewString()})
 	case CommandTheme:
+		if len(command.Args) == 0 {
+			m.commandInput.SetValue("/theme")
+			m.syncThemePicker()
+			return m, nil
+		}
 		theme, ok := themeByName(command.Args[0])
 		if !ok {
 			m.setStatus(statusError, "Unknown theme: "+command.Args[0]+". Available: "+strings.Join(themeNames(), ", ")+".")
