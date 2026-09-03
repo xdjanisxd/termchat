@@ -871,7 +871,8 @@ func userFacingCommandError(err error) string {
 
 func (m *Model) renderMessages() string {
 	if len(m.messages) == 0 {
-		return m.theme.emptyState.Render("No messages yet.")
+		width, _ := m.terminalSize()
+		return m.theme.viewport.Width(width).Render(m.theme.emptyState.Render("No messages yet."))
 	}
 	width, _ := m.terminalSize()
 	lines := make([]string, 0, len(m.messages))

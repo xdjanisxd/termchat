@@ -25,6 +25,21 @@ func TestHistoryPagePrependsOlderMessagesAndUpdatesAvailability(t *testing.T) {
 	}
 }
 
+func TestEmptyMessageStateFillsViewportWidthWithThemeBackground(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.width = 80
+
+	rendered := model.renderMessages()
+	if got := lipgloss.Width(rendered); got != model.width {
+		t.Fatalf("empty message width = %d, want %d", got, model.width)
+	}
+	if !strings.Contains(ansi.Strip(rendered), "No messages yet.") {
+		t.Fatalf("empty state text missing: %q", ansi.Strip(rendered))
+	}
+}
+
 func TestMessagesDistinguishCurrentUserWithoutRelyingOnColor(t *testing.T) {
 	t.Parallel()
 
