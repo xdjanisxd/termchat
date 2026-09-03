@@ -7,7 +7,6 @@ type User struct {
 	Username     string
 	PasswordHash string
 	CreatedAt    time.Time
-	LastSeenAt   *time.Time
 }
 
 type PublicUser struct {

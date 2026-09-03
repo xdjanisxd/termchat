@@ -41,10 +41,10 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User) error {
 func (s *Store) UserByUsername(ctx context.Context, username string) (domain.User, error) {
 	var user domain.User
 	err := s.db.QueryRow(ctx, `
-		SELECT id, username, password_hash, created_at, last_seen_at
+		SELECT id, username, password_hash, created_at
 		FROM users
 		WHERE username = $1
-	`, username).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.CreatedAt, &user.LastSeenAt)
+	`, username).Scan(&user.ID, &user.Username, &user.PasswordHash, &user.CreatedAt)
 	if err != nil {
 		return domain.User{}, mapError(err, "find user by username")
 	}

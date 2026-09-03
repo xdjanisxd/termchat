@@ -67,10 +67,10 @@ func TestStoreUserByUsername(t *testing.T) {
 	defer db.Close()
 	repository := New(db)
 	createdAt := time.Date(2026, time.August, 26, 15, 0, 0, 0, time.UTC)
-	db.ExpectQuery("SELECT id, username, password_hash, created_at, last_seen_at FROM users").
+	db.ExpectQuery("SELECT id, username, password_hash, created_at FROM users").
 		WithArgs("alice").
-		WillReturnRows(pgxmock.NewRows([]string{"id", "username", "password_hash", "created_at", "last_seen_at"}).
-			AddRow("user-1", "alice", "argon-hash", createdAt, nil))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "username", "password_hash", "created_at"}).
+			AddRow("user-1", "alice", "argon-hash", createdAt))
 
 	user, err := repository.UserByUsername(context.Background(), "alice")
 	if err != nil {
