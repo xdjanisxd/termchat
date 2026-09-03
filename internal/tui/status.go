@@ -72,7 +72,7 @@ func (m *Model) renderNotification(note notification) string {
 func (m *Model) notificationTrayHeight(width int) int {
 	height := 0
 	if m.activeNotification.id != 0 {
-		height++
+		height += len(strings.Split(m.renderStatusToast(width), "\n"))
 	}
 	if m.pendingDirectInvite != "" && m.pendingDirectSender != nil {
 		height += 2
@@ -83,7 +83,7 @@ func (m *Model) notificationTrayHeight(width int) int {
 func (m *Model) renderNotificationTray(width int) string {
 	lines := make([]string, 0, m.notificationTrayHeight(width))
 	if m.activeNotification.id != 0 {
-		lines = append(lines, m.renderStatusToast(width))
+		lines = append(lines, strings.Split(m.renderStatusToast(width), "\n")...)
 	}
 	if m.pendingDirectInvite != "" && m.pendingDirectSender != nil {
 		lines = append(lines,
@@ -105,8 +105,12 @@ func (m *Model) renderStatusToast(width int) string {
 		return ""
 	}
 	maxWidth := maxInt(1, width/2)
-	toast := ansi.Truncate(m.renderNotification(m.activeNotification), maxWidth, "…")
-	return lipgloss.NewStyle().Width(width).Align(lipgloss.Right).Render(toast)
+	wrapped := ansi.Wordwrap(m.renderNotification(m.activeNotification), maxWidth, " ")
+	lines := strings.Split(wrapped, "\n")
+	for index := range lines {
+		lines[index] = lipgloss.NewStyle().Width(width).Align(lipgloss.Right).Render(lines[index])
+	}
+	return strings.Join(lines, "\n")
 }
 
 func notificationDuration(level statusLevel) time.Duration {

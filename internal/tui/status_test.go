@@ -112,6 +112,25 @@ func TestStatusToastUsesUpperRightOverlayAndExpires(t *testing.T) {
 	}
 }
 
+func TestLongStatusToastWrapsInsteadOfTruncating(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.screen = ScreenHome
+	updateModel(t, model, tea.WindowSizeMsg{Width: 60, Height: 24})
+	model.setStatus(statusError, "Account deletion is not available on this server. Update the server and run its migrations.")
+
+	plain := ansi.Strip(model.View())
+	for _, fragment := range []string{"Account deletion is", "not available on this server.", "run its", "migrations."} {
+		if !strings.Contains(plain, fragment) {
+			t.Fatalf("long toast was truncated; missing %q:\n%s", fragment, plain)
+		}
+	}
+	if got := model.notificationTrayHeight(model.width); got < 2 {
+		t.Fatalf("long toast height = %d, want multiple lines", got)
+	}
+}
+
 func TestStatusToastTickerExpiresElapsedToast(t *testing.T) {
 	t.Parallel()
 
