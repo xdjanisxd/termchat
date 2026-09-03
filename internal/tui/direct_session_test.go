@@ -41,6 +41,25 @@ func TestDirectSessionStartReplacesRoomContext(t *testing.T) {
 	}
 }
 
+func TestDirectInviteUnavailableToastDoesNotRevealPresence(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.screen = ScreenHome
+	model.width, model.height = 100, 24
+	model.applyServerEvent(protocol.ServerEvent{Type: "error", Error: &protocol.EventError{Code: "DIRECT_UNAVAILABLE", Message: "Direct invitation could not be delivered."}})
+
+	plain := ansi.Strip(model.renderStatusToast(model.width))
+	if !strings.Contains(plain, "Direct invitation could not be delivered.") {
+		t.Fatalf("generic direct invite error was not rendered:\n%s", plain)
+	}
+	for _, forbidden := range []string{"offline", "connected", "pending invitation", "room"} {
+		if strings.Contains(strings.ToLower(plain), forbidden) {
+			t.Fatalf("generic direct invite error revealed %q:\n%s", forbidden, plain)
+		}
+	}
+}
+
 func TestDirectInviteAcceptanceOpensEphemeralChatAndRendersCounterpart(t *testing.T) {
 	t.Parallel()
 

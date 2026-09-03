@@ -199,7 +199,7 @@ func TestDirectInviteRejectsSelfOfflineAndUnauthorizedAcceptance(t *testing.T) {
 	for _, target := range []string{"alice", "offline"} {
 		mustWriteDirect(t, ctx, alice, ClientEvent{Type: "direct_invite", RequestID: "reject-" + target, TargetUsername: target})
 		response := readUntilEvent(t, ctx, alice, "error")
-		if response.Error == nil || response.Error.Code != "INVALID_DIRECT_TARGET" {
+		if response.Error == nil || response.Error.Code != "DIRECT_UNAVAILABLE" || response.Error.Message != "Direct invitation could not be delivered." {
 			t.Fatalf("target %q response = %#v", target, response)
 		}
 	}
@@ -207,6 +207,12 @@ func TestDirectInviteRejectsSelfOfflineAndUnauthorizedAcceptance(t *testing.T) {
 	mustWriteDirect(t, ctx, alice, ClientEvent{Type: "direct_invite", RequestID: "invite-1", TargetUsername: "bob"})
 	invite := readUntilEvent(t, ctx, bob, "direct_invite_received")
 	readUntilEvent(t, ctx, alice, "direct_invite_sent")
+	mustWriteDirect(t, ctx, mallory, ClientEvent{Type: "direct_invite", RequestID: "invite-pending", TargetUsername: "alice"})
+	pendingResponse := readUntilEvent(t, ctx, mallory, "error")
+	if pendingResponse.Error == nil || pendingResponse.Error.Code != "DIRECT_UNAVAILABLE" || pendingResponse.Error.Message != "Direct invitation could not be delivered." {
+		t.Fatalf("pending invite response = %#v", pendingResponse)
+	}
+
 	mustWriteDirect(t, ctx, mallory, ClientEvent{Type: "direct_invite_accept", RequestID: "steal-1", InviteID: invite.InviteID})
 	response := readUntilEvent(t, ctx, mallory, "error")
 	if response.Error == nil || response.Error.Code != "INVALID_DIRECT_INVITE" {

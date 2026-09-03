@@ -135,7 +135,7 @@ func (h *ChatHandler) handle(client *chatClient, event ClientEvent) {
 	case "direct_invite":
 		invite, recipient, err := h.hub.inviteDirect(client, event.TargetUsername, time.Now().UTC())
 		if err != nil {
-			client.write(directError(event.RequestID, err))
+			client.write(directInviteError(event.RequestID, err))
 			return
 		}
 		expiresAt := invite.expiresAt
@@ -238,6 +238,13 @@ func namedError(requestID, code, message string) ServerEvent {
 
 func directIdentity(client *chatClient) *protocol.DirectIdentity {
 	return &protocol.DirectIdentity{UserID: client.identity.UserID, Username: client.identity.Username}
+}
+
+func directInviteError(requestID string, err error) ServerEvent {
+	if errors.Is(err, errInvalidDirectTarget) || errors.Is(err, errDirectContextBusy) {
+		return namedError(requestID, "DIRECT_UNAVAILABLE", "Direct invitation could not be delivered.")
+	}
+	return directError(requestID, err)
 }
 
 func directError(requestID string, err error) ServerEvent {
