@@ -11,6 +11,7 @@ import (
 
 	"termchat.local/termchat/internal/domain"
 	"termchat.local/termchat/internal/security"
+	"termchat.local/termchat/internal/store"
 )
 
 const MinRoomPasswordLength = 8
@@ -23,6 +24,7 @@ var (
 type RoomRepository interface {
 	CreateRoom(ctx context.Context, room domain.Room) error
 	RoomByName(ctx context.Context, name string) (domain.Room, error)
+	RoomByID(ctx context.Context, id string) (domain.Room, error)
 	UpdateRoomPassword(ctx context.Context, roomID, ownerID, passwordHash string) error
 	DeleteRoom(ctx context.Context, roomID, ownerID string) error
 }
@@ -62,6 +64,17 @@ func (s *RoomService) Join(ctx context.Context, userID, name, password string) (
 		return domain.PublicRoom{}, ErrInvalidRoomCredentials
 	}
 	return room.PublicFor(userID), nil
+}
+
+func (s *RoomService) InviteRoom(ctx context.Context, ownerID, roomID string) (domain.PublicRoom, error) {
+	room, err := s.rooms.RoomByID(ctx, roomID)
+	if err != nil {
+		return domain.PublicRoom{}, err
+	}
+	if room.CreatedBy != ownerID {
+		return domain.PublicRoom{}, fmt.Errorf("invite room: %w", store.ErrForbidden)
+	}
+	return room.PublicFor(ownerID), nil
 }
 
 func (s *RoomService) ChangePassword(ctx context.Context, ownerID, roomID, password string) error {

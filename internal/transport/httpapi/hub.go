@@ -10,6 +10,8 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 	"github.com/google/uuid"
+
+	"termchat.local/termchat/internal/domain"
 )
 
 const directInviteTTL = 60 * time.Second
@@ -57,24 +59,31 @@ type directInvite struct {
 	expiresAt                 time.Time
 }
 
+type roomInvite struct {
+	id, senderID, recipientID string
+	room                      domain.PublicRoom
+	expiresAt                 time.Time
+}
+
 type directSession struct {
 	id                string
 	firstID, secondID string
 }
 
 type chatHub struct {
-	mu       sync.RWMutex
-	rooms    map[string]map[*chatClient]struct{}
-	users    map[string]*chatClient
-	byName   map[string]*chatClient
-	invites  map[string]directInvite
-	sessions map[string]directSession
+	mu          sync.RWMutex
+	rooms       map[string]map[*chatClient]struct{}
+	users       map[string]*chatClient
+	byName      map[string]*chatClient
+	invites     map[string]directInvite
+	roomInvites map[string]roomInvite
+	sessions    map[string]directSession
 }
 
 func newChatHub() *chatHub {
 	return &chatHub{
 		rooms: make(map[string]map[*chatClient]struct{}), users: make(map[string]*chatClient), byName: make(map[string]*chatClient),
-		invites: make(map[string]directInvite), sessions: make(map[string]directSession),
+		invites: make(map[string]directInvite), roomInvites: make(map[string]roomInvite), sessions: make(map[string]directSession),
 	}
 }
 
@@ -361,8 +370,76 @@ func (h *chatHub) expireInvite(inviteID string, expectedExpiry time.Time) {
 	}
 }
 
+func (h *chatHub) inviteRoom(sender *chatClient, targetUsername string, room domain.PublicRoom, now time.Time) (roomInvite, *chatClient, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	target := h.byName[targetUsername]
+	if target == nil || target == sender || h.hasInviteLocked(sender.identity.UserID) || h.hasInviteLocked(target.identity.UserID) {
+		return roomInvite{}, nil, errInvalidDirectTarget
+	}
+	invite := roomInvite{id: uuid.NewString(), senderID: sender.identity.UserID, recipientID: target.identity.UserID, room: room, expiresAt: now.Add(directInviteTTL)}
+	h.roomInvites[invite.id] = invite
+	go func(id string, expiry time.Time) {
+		timer := time.NewTimer(time.Until(expiry))
+		defer timer.Stop()
+		<-timer.C
+		h.expireRoomInvite(id, expiry)
+	}(invite.id, invite.expiresAt)
+	return invite, target, nil
+}
+
+func (h *chatHub) acceptRoomInvite(recipient *chatClient, inviteID string, now time.Time) (domain.PublicRoom, *chatClient, error) {
+	h.mu.Lock()
+	invite, ok := h.roomInvites[inviteID]
+	if !ok || invite.recipientID != recipient.identity.UserID || !now.Before(invite.expiresAt) {
+		h.mu.Unlock()
+		return domain.PublicRoom{}, nil, errInvalidDirectInvite
+	}
+	sender := h.users[invite.senderID]
+	delete(h.roomInvites, inviteID)
+	h.mu.Unlock()
+	if sender == nil {
+		return domain.PublicRoom{}, nil, errInvalidDirectInvite
+	}
+	h.join(recipient, invite.room.ID)
+	return invite.room, sender, nil
+}
+
+func (h *chatHub) declineRoomInvite(recipient *chatClient, inviteID string) (*chatClient, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	invite, ok := h.roomInvites[inviteID]
+	if !ok || invite.recipientID != recipient.identity.UserID {
+		return nil, errInvalidDirectInvite
+	}
+	delete(h.roomInvites, inviteID)
+	return h.users[invite.senderID], nil
+}
+
+func (h *chatHub) expireRoomInvite(id string, expiry time.Time) {
+	h.mu.Lock()
+	invite, ok := h.roomInvites[id]
+	if !ok || !invite.expiresAt.Equal(expiry) || time.Now().UTC().Before(expiry) {
+		h.mu.Unlock()
+		return
+	}
+	delete(h.roomInvites, id)
+	sender, recipient := h.users[invite.senderID], h.users[invite.recipientID]
+	h.mu.Unlock()
+	for _, client := range []*chatClient{sender, recipient} {
+		if client != nil {
+			_ = client.write(ServerEvent{Type: "room_invite_expired", InviteID: id})
+		}
+	}
+}
+
 func (h *chatHub) hasInviteLocked(userID string) bool {
 	for _, invite := range h.invites {
+		if invite.senderID == userID || invite.recipientID == userID {
+			return true
+		}
+	}
+	for _, invite := range h.roomInvites {
 		if invite.senderID == userID || invite.recipientID == userID {
 			return true
 		}

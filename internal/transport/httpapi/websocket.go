@@ -136,6 +136,42 @@ func (h *ChatHandler) handle(client *chatClient, event ClientEvent) {
 			return
 		}
 		h.hub.broadcast(roomID, ServerEvent{Type: "new_message", Message: &message})
+	case "room_invite":
+		roomID := client.room()
+		if roomID == "" {
+			client.write(namedError(event.RequestID, "NOT_IN_ROOM", "Join a room first."))
+			return
+		}
+		room, err := h.rooms.InviteRoom(ctx, client.identity.UserID, roomID)
+		if err != nil {
+			client.write(eventError(event.RequestID, err))
+			return
+		}
+		invite, target, err := h.hub.inviteRoom(client, event.TargetUsername, room, time.Now().UTC())
+		if err != nil {
+			client.write(namedError(event.RequestID, "ROOM_INVITE_UNAVAILABLE", "Room invitation could not be delivered."))
+			return
+		}
+		expiresAt := invite.expiresAt
+		client.write(ServerEvent{Type: "room_invite_sent", RequestID: event.RequestID, InviteID: invite.id, ExpiresAt: &expiresAt})
+		target.write(ServerEvent{Type: "room_invite_received", InviteID: invite.id, ExpiresAt: &expiresAt, Room: &room, Counterpart: directIdentity(client)})
+	case "room_invite_accept":
+		room, _, err := h.hub.acceptRoomInvite(client, event.InviteID, time.Now().UTC())
+		if err != nil {
+			client.write(directError(event.RequestID, err))
+			return
+		}
+		client.write(ServerEvent{Type: "room_joined", RequestID: event.RequestID, Room: &room})
+	case "room_invite_decline":
+		sender, err := h.hub.declineRoomInvite(client, event.InviteID)
+		if err != nil {
+			client.write(directError(event.RequestID, err))
+			return
+		}
+		client.write(ServerEvent{Type: "room_invite_declined", RequestID: event.RequestID, InviteID: event.InviteID})
+		if sender != nil {
+			sender.write(ServerEvent{Type: "room_invite_declined", InviteID: event.InviteID})
+		}
 	case "direct_invite":
 		invite, recipient, err := h.hub.inviteDirect(client, event.TargetUsername, time.Now().UTC())
 		if err != nil {

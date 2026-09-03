@@ -51,6 +51,16 @@ func (r *wsRoomRepository) RoomByName(_ context.Context, name string) (domain.Ro
 	return r.byID[id], nil
 }
 
+func (r *wsRoomRepository) RoomByID(_ context.Context, id string) (domain.Room, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	room, exists := r.byID[id]
+	if !exists {
+		return domain.Room{}, store.ErrNotFound
+	}
+	return room, nil
+}
+
 func (r *wsRoomRepository) UpdateRoomPassword(_ context.Context, roomID, ownerID, hash string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

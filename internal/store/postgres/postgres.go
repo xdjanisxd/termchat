@@ -86,6 +86,15 @@ func (s *Store) RoomByName(ctx context.Context, name string) (domain.Room, error
 	return room, nil
 }
 
+func (s *Store) RoomByID(ctx context.Context, id string) (domain.Room, error) {
+	var room domain.Room
+	err := s.db.QueryRow(ctx, `SELECT id, name, password_hash, created_by, created_at FROM rooms WHERE id = $1`, id).Scan(&room.ID, &room.Name, &room.PasswordHash, &room.CreatedBy, &room.CreatedAt)
+	if err != nil {
+		return domain.Room{}, mapError(err, "find room by id")
+	}
+	return room, nil
+}
+
 func (s *Store) UpdateRoomPassword(ctx context.Context, roomID, ownerID, passwordHash string) error {
 	result, err := s.db.Exec(ctx, `
 		UPDATE rooms

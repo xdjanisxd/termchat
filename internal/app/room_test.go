@@ -37,6 +37,14 @@ func (r *fakeRoomRepository) RoomByName(_ context.Context, name string) (domain.
 	return r.byID[id], nil
 }
 
+func (r *fakeRoomRepository) RoomByID(_ context.Context, id string) (domain.Room, error) {
+	room, exists := r.byID[id]
+	if !exists {
+		return domain.Room{}, store.ErrNotFound
+	}
+	return room, nil
+}
+
 func (r *fakeRoomRepository) UpdateRoomPassword(_ context.Context, roomID, ownerID, passwordHash string) error {
 	room, exists := r.byID[roomID]
 	if !exists {
@@ -90,6 +98,25 @@ func TestRoomServiceCreateAndJoinPrivateRoom(t *testing.T) {
 	}
 	if _, err := service.Join(context.Background(), "user-2", "rust-devs_01", "wrongpass"); !errors.Is(err, ErrInvalidRoomCredentials) {
 		t.Fatalf("Join() error = %v, want ErrInvalidRoomCredentials", err)
+	}
+}
+
+func TestRoomServiceInviteRequiresOwner(t *testing.T) {
+	t.Parallel()
+
+	repo := newFakeRoomRepository()
+	hasher := security.NewPasswordHasher(security.Argon2Params{Memory: 8 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32})
+	service := NewRoomService(repo, hasher)
+	room, err := service.Create(context.Background(), "owner-1", "private_room", "roompass", time.Now().UTC())
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if _, err := service.InviteRoom(context.Background(), "user-2", room.ID); !errors.Is(err, store.ErrForbidden) {
+		t.Fatalf("InviteRoom() non-owner error = %v", err)
+	}
+	invited, err := service.InviteRoom(context.Background(), "owner-1", room.ID)
+	if err != nil || invited.ID != room.ID || !invited.IsOwner {
+		t.Fatalf("InviteRoom() = %#v, %v", invited, err)
 	}
 }
 

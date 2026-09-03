@@ -14,6 +14,7 @@ const (
 	CommandCreateRoom         CommandKind = "create_room"
 	CommandJoinRoom           CommandKind = "join_room"
 	CommandDirectMessage      CommandKind = "direct_message"
+	CommandInviteRoom         CommandKind = "invite_room"
 	CommandAcceptDirect       CommandKind = "accept_direct"
 	CommandDeclineDirect      CommandKind = "decline_direct"
 	CommandLeaveRoom          CommandKind = "leave_room"
@@ -44,6 +45,7 @@ var commandDefinitions = map[string]commandDefinition{
 	"/createroom":    {kind: CommandCreateRoom, argCount: 2, usage: "/createroom <room-name> <password>"},
 	"/join":          {kind: CommandJoinRoom, argCount: 1, usage: "/join <room-name>"},
 	"/dm":            {kind: CommandDirectMessage, argCount: 1, usage: "/dm <username>"},
+	"/invite":        {kind: CommandInviteRoom, argCount: 1, usage: "/invite <username>"},
 	"/accept":        {kind: CommandAcceptDirect, usage: "/accept"},
 	"/decline":       {kind: CommandDeclineDirect, usage: "/decline"},
 	"/l":             {kind: CommandLeaveRoom, usage: "/l"},

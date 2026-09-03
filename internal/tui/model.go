@@ -110,6 +110,7 @@ type Model struct {
 	directSessionID      string
 	pendingDirectInvite  string
 	pendingDirectSender  *protocol.DirectIdentity
+	pendingRoomInvite    string
 	messages             []domain.Message
 	historyLoading       bool
 	historyHasMore       bool
@@ -464,6 +465,8 @@ func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 		m.roomPassword.Focus()
 		m.screen = ScreenRoomPassword
 		m.setStatus(statusInfo, "Enter the password for "+command.Args[0])
+	case CommandInviteRoom:
+		return m, m.sendEventCmd(protocol.ClientEvent{Type: "room_invite", RequestID: uuid.NewString(), TargetUsername: command.Args[0]})
 	case CommandDirectMessage:
 		if m.screen != ScreenHome {
 			m.setStatus(statusWarning, "Leave the current chat before starting a direct chat.")
@@ -471,6 +474,9 @@ func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 		}
 		return m, m.sendEventCmd(protocol.ClientEvent{Type: "direct_invite", RequestID: uuid.NewString(), TargetUsername: command.Args[0]})
 	case CommandAcceptDirect:
+		if m.pendingRoomInvite != "" {
+			return m, m.sendEventCmd(protocol.ClientEvent{Type: "room_invite_accept", RequestID: uuid.NewString(), InviteID: m.pendingRoomInvite})
+		}
 		if m.pendingDirectInvite == "" {
 			m.setStatus(statusWarning, "There is no direct invitation to accept.")
 			return m, nil
@@ -588,6 +594,13 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 			}
 			m.setStatus(statusError, event.Error.Message)
 		}
+	case "room_invite_received":
+		m.pendingRoomInvite = event.InviteID
+		if event.Room != nil {
+			m.setStatus(statusInfo, "Room invitation received for "+event.Room.Name+". Type /accept or /decline.")
+		}
+	case "room_invite_declined", "room_invite_expired":
+		m.pendingRoomInvite = ""
 	case "room_joined":
 		m.rejoinInFlight = false
 		m.room = event.Room
