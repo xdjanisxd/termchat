@@ -20,6 +20,7 @@ const (
 	CommandWho                CommandKind = "who"
 	CommandChangeRoomPassword CommandKind = "change_room_password"
 	CommandDeleteRoom         CommandKind = "delete_room"
+	CommandDeleteAccount      CommandKind = "delete_account"
 	CommandTheme              CommandKind = "theme"
 	CommandQuit               CommandKind = "quit"
 )
@@ -39,18 +40,19 @@ type commandDefinition struct {
 }
 
 var commandDefinitions = map[string]commandDefinition{
-	"/help":       {kind: CommandHelp, usage: "/help"},
-	"/createroom": {kind: CommandCreateRoom, argCount: 2, usage: "/createroom <room-name> <password>"},
-	"/join":       {kind: CommandJoinRoom, argCount: 1, usage: "/join <room-name>"},
-	"/dm":         {kind: CommandDirectMessage, argCount: 1, usage: "/dm <username>"},
-	"/accept":     {kind: CommandAcceptDirect, usage: "/accept"},
-	"/decline":    {kind: CommandDeclineDirect, usage: "/decline"},
-	"/l":          {kind: CommandLeaveRoom, usage: "/l"},
-	"/who":        {kind: CommandWho, usage: "/who"},
-	"/roompasswd": {kind: CommandChangeRoomPassword, argCount: 1, usage: "/roompasswd <new-password>"},
-	"/deleteroom": {kind: CommandDeleteRoom, usage: "/deleteroom"},
-	"/theme":      {kind: CommandTheme, argCount: 1, optionalArg: true, usage: "/theme [theme-name]"},
-	"/q":          {kind: CommandQuit, usage: "/q"},
+	"/help":          {kind: CommandHelp, usage: "/help"},
+	"/createroom":    {kind: CommandCreateRoom, argCount: 2, usage: "/createroom <room-name> <password>"},
+	"/join":          {kind: CommandJoinRoom, argCount: 1, usage: "/join <room-name>"},
+	"/dm":            {kind: CommandDirectMessage, argCount: 1, usage: "/dm <username>"},
+	"/accept":        {kind: CommandAcceptDirect, usage: "/accept"},
+	"/decline":       {kind: CommandDeclineDirect, usage: "/decline"},
+	"/l":             {kind: CommandLeaveRoom, usage: "/l"},
+	"/who":           {kind: CommandWho, usage: "/who"},
+	"/roompasswd":    {kind: CommandChangeRoomPassword, argCount: 1, usage: "/roompasswd <new-password>"},
+	"/deleteroom":    {kind: CommandDeleteRoom, usage: "/deleteroom"},
+	"/deleteaccount": {kind: CommandDeleteAccount, argCount: 1, optionalArg: true, usage: "/deleteaccount confirm"},
+	"/theme":         {kind: CommandTheme, argCount: 1, optionalArg: true, usage: "/theme [theme-name]"},
+	"/q":             {kind: CommandQuit, usage: "/q"},
 }
 
 func ParseInput(input string) (Command, error) {

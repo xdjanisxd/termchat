@@ -63,6 +63,32 @@ func TestAuthServiceRegisterAndLogin(t *testing.T) {
 	}
 }
 
+func TestAuthServiceDeleteAccountRemovesAuthenticatedUser(t *testing.T) {
+	t.Parallel()
+
+	repo := &fakeUserRepository{users: map[string]domain.User{
+		"alice": {ID: "user-1", Username: "alice"},
+	}}
+	service := NewAuthService(repo, security.NewPasswordHasher(security.Argon2Params{}), security.NewTokenManager([]byte("01234567890123456789012345678901"), time.Hour))
+
+	if err := service.DeleteAccount(context.Background(), "user-1"); err != nil {
+		t.Fatalf("DeleteAccount() error = %v", err)
+	}
+	if _, exists := repo.users["alice"]; exists {
+		t.Fatal("DeleteAccount() did not remove the user")
+	}
+}
+
+func (r *fakeUserRepository) DeleteUser(_ context.Context, userID string) error {
+	for username, user := range r.users {
+		if user.ID == userID {
+			delete(r.users, username)
+			return nil
+		}
+	}
+	return store.ErrNotFound
+}
+
 func TestAuthServiceRejectsInvalidCredentials(t *testing.T) {
 	t.Parallel()
 

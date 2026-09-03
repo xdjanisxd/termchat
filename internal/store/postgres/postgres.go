@@ -51,6 +51,17 @@ func (s *Store) UserByUsername(ctx context.Context, username string) (domain.Use
 	return user, nil
 }
 
+func (s *Store) DeleteUser(ctx context.Context, userID string) error {
+	result, err := s.db.Exec(ctx, `DELETE FROM users WHERE id = $1`, userID)
+	if err != nil {
+		return mapError(err, "delete user")
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("delete user: %w", store.ErrNotFound)
+	}
+	return nil
+}
+
 func (s *Store) CreateRoom(ctx context.Context, room domain.Room) error {
 	_, err := s.db.Exec(ctx, `
 		INSERT INTO rooms (id, name, password_hash, created_by, created_at)

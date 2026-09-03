@@ -36,6 +36,7 @@ flowchart TD
 | `/who` | oda | o an WebSocket ile bağlı oda kullanıcılarını gösterir |
 | `/roompasswd <yeni-parola>` | oda sahibi | oda parolasını değiştirir |
 | `/deleteroom` | oda sahibi | açık onaydan sonra oda ve mesajlarını siler |
+| `/deleteaccount confirm` | her yer | hesabı, kullanıcıya ait tüm kalıcı mesajları ve sahip olduğu room'ları geri döndürülemez biçimde siler; aktif bağlantıyı kapatır |
 | `/theme [tema-adı]` | ana ekran veya oda | argümansız kullanımda `Tab`/`Shift+Tab` ile gezinilen, `Enter` ile uygulanan ve `Esc` ile kapatılan tema seçiciyi açar; tema adı verilirse doğrudan değiştirir. `amber-crt`, `green-crt`, `ice-blue`, `synthwave`, `cyberpunk` desteklenir |
 | `/q` | her yer | istemciyi kapatır |
 
@@ -46,6 +47,7 @@ Varsayılan tema `amber-crt`'dir. Tema seçimi sunucuya gönderilmez ve diske ya
 ```text
 POST /v1/auth/register
 POST /v1/auth/login
+DELETE /v1/auth/account
 GET  /v1/users/me
 GET  /v1/rooms/{room_id}/messages?before={message_id}&limit=50
 GET  /healthz

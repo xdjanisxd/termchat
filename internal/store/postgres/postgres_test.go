@@ -81,6 +81,25 @@ func TestStoreUserByUsername(t *testing.T) {
 	}
 }
 
+func TestStoreDeleteUserCascadesAccountData(t *testing.T) {
+	t.Parallel()
+
+	db, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock.NewPool() error = %v", err)
+	}
+	defer db.Close()
+	repository := New(db)
+	db.ExpectExec("DELETE FROM users").WithArgs("user-1").WillReturnResult(pgxmock.NewResult("DELETE", 1))
+
+	if err := repository.DeleteUser(context.Background(), "user-1"); err != nil {
+		t.Fatalf("DeleteUser() error = %v", err)
+	}
+	if err := db.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet SQL expectations: %v", err)
+	}
+}
+
 func TestStoreCreateAndFindRoom(t *testing.T) {
 	t.Parallel()
 

@@ -13,6 +13,10 @@ import (
 
 type HealthCheck func(context.Context) error
 
+type AccountDeletionHandler interface {
+	DeleteAccount(http.ResponseWriter, *http.Request)
+}
+
 func NewRouter(
 	authRoutes http.Handler,
 	authMiddleware func(http.Handler) http.Handler,
@@ -46,6 +50,9 @@ func NewRouter(
 		protected.Use(authMiddleware)
 		if attempts != nil {
 			protected.Use(attempts.UserMiddleware)
+		}
+		if accountDeletion, ok := authRoutes.(AccountDeletionHandler); ok {
+			protected.Delete("/v1/auth/account", accountDeletion.DeleteAccount)
 		}
 		protected.Get("/v1/users/me", func(w http.ResponseWriter, r *http.Request) {
 			identity, ok := IdentityFromContext(r.Context())

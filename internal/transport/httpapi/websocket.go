@@ -31,6 +31,10 @@ func NewChatHandler(rooms *app.RoomService, messages *app.MessageService, attemp
 	return handler
 }
 
+func (h *ChatHandler) DisconnectUser(userID string) {
+	h.hub.disconnectUser(userID)
+}
+
 func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	identity, ok := IdentityFromContext(r.Context())
 	if !ok {

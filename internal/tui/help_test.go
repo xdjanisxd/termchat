@@ -29,7 +29,7 @@ func TestHelpScreenShowsScannableCommandGroups(t *testing.T) {
 
 	model := NewModel(nil)
 	model.screen = ScreenHelp
-	updateModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
+	updateModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 28})
 
 	view := model.View()
 	plain := ansi.Strip(view)
@@ -45,6 +45,7 @@ func TestHelpScreenShowsScannableCommandGroups(t *testing.T) {
 		"/roompasswd <password>",
 		"/deleteroom",
 		"APP",
+		"/deleteaccount confirm",
 		"/help",
 		"/theme [theme-name]",
 		"amber-crt",
@@ -62,8 +63,8 @@ func TestHelpScreenShowsScannableCommandGroups(t *testing.T) {
 	if got := lipgloss.Width(view); got > 80 {
 		t.Fatalf("View() width = %d, want <= 80", got)
 	}
-	if got := lipgloss.Height(view); got != 24 {
-		t.Fatalf("View() height = %d, want 24", got)
+	if got := lipgloss.Height(view); got != 28 {
+		t.Fatalf("View() height = %d, want 28", got)
 	}
 }
 

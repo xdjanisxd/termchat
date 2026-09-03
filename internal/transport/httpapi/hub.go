@@ -105,6 +105,18 @@ func (h *chatHub) unregister(client *chatClient) {
 	h.mu.Unlock()
 }
 
+func (h *chatHub) disconnectUser(userID string) {
+	h.mu.RLock()
+	client := h.users[userID]
+	h.mu.RUnlock()
+	if client == nil {
+		return
+	}
+	h.unregister(client)
+	_ = client.write(ServerEvent{Type: "account_deleted"})
+	_ = client.conn.Close(websocket.StatusNormalClosure, "account deleted")
+}
+
 func (h *chatHub) join(client *chatClient, roomID string) {
 	h.cancelInvitesFor(client, "direct_invite_cancelled")
 	h.endDirect(client, "participant_left")
