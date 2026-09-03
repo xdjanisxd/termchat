@@ -41,6 +41,24 @@ func TestClientRegisterStoresSession(t *testing.T) {
 	}
 }
 
+func TestClientDeleteAccountExplainsMissingServerEndpoint(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.NotFoundHandler())
+	defer server.Close()
+	api, err := New(server.URL)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	api.SetToken("jwt-token")
+
+	err = api.DeleteAccount(context.Background())
+	apiErr, ok := err.(*APIError)
+	if !ok || apiErr.Status != http.StatusNotFound || apiErr.Code != "ACCOUNT_DELETE_UNAVAILABLE" {
+		t.Fatalf("DeleteAccount() error = %#v", err)
+	}
+}
+
 func TestClientReturnsStructuredAPIError(t *testing.T) {
 	t.Parallel()
 

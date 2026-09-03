@@ -86,7 +86,20 @@ func (c *Client) DeleteAccount(ctx context.Context) error {
 		return fmt.Errorf("delete account: %w", err)
 	}
 	defer response.Body.Close()
+	body := io.LimitReader(response.Body, maxResponseBody)
 	if response.StatusCode != http.StatusNoContent {
+		if response.StatusCode == http.StatusNotFound {
+			return &APIError{Status: response.StatusCode, Code: "ACCOUNT_DELETE_UNAVAILABLE", Message: "Account deletion is not available on this server. Update the server and run its migrations."}
+		}
+		var envelope struct {
+			Error struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.NewDecoder(body).Decode(&envelope); err == nil && envelope.Error.Message != "" {
+			return &APIError{Status: response.StatusCode, Code: envelope.Error.Code, Message: envelope.Error.Message}
+		}
 		return &APIError{Status: response.StatusCode, Code: "ACCOUNT_DELETE_FAILED", Message: "The account could not be deleted."}
 	}
 	c.SetToken("")
