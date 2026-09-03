@@ -136,7 +136,7 @@ Ek olaylar: `leave_room`, `create_room`, `change_room_password`, `delete_room`, 
 
 ## Ephemeral direct-chat sözleşmesi
 
-Direct chat oda oluşturmaz ve room/message persistence akışını kullanmaz. Başlatan ve hedef kullanıcı aynı anda online olmalıdır; hedef kabul etmeden mesaj iletimi başlamaz. Oda veya başka bir direct chat içinde olan online kullanıcıya da direct invite ulaşır. Hedef kabul ederse, server iki kabul eden tarafı mevcut room/direct bağlamlarından atomik olarak çıkarır; varsa eski direct peer'e `direct_session_ended` gönderir ve ardından yeni exclusive direct session'ı başlatır. Bir kullanıcı aynı anda yalnız bir pending direct invite bağlamında bulunabilir.
+Direct chat oda oluşturmaz ve room/message persistence akışını kullanmaz. Başlatan ve hedef kullanıcı aynı anda online olmalıdır; hedef kabul etmeden mesaj iletimi başlamaz. Oda veya başka bir direct chat içinde olan online kullanıcıya da direct invite ulaşır. Hedef kabul ederse, server iki kabul eden tarafı mevcut room/direct bağlamlarından atomik olarak çıkarır; varsa eski direct peer'e `direct_session_ended` gönderir ve ardından yeni exclusive direct session'ı başlatır. Bir kullanıcı aynı anda yalnız bir pending direct invite bağlamında bulunabilir. Hedefin varlığı, online durumu veya pending-invite durumu gizlidir: teslim edilemeyen invite'lar başlatana yalnız `DIRECT_UNAVAILABLE` / `Direct invitation could not be delivered.` sonucu döndürür.
 
 ```text
 client A -- direct_invite(target_username) --> server
@@ -163,9 +163,9 @@ Normal `[INFO]`, `[OK]`, `[WARN]` ve `[ERROR]` mesajları sağ üstte tek bir ti
 
 ## Güvenlik kuralları
 
-- JWT yalnızca TLS/WSS üzerinden taşınır.
+- JWT yalnızca TLS/WSS üzerinden taşınır ve varsayılan olarak 1 saat sonra sona erer; süresi biten token ile yeni bir kimlik doğrulama veya reconnect için tekrar login gerekir.
 - Kullanıcı ve oda parolaları Argon2id ile hashlenir.
 - `/join` oda parolasını komut argümanı olarak almaz; maskeli input kullanır.
 - Sunucu; mesaj uzunluğu, isim formatı ve yetki kontrolünü uygular.
 - Mesaj hız sınırı kullanıcı başına 2 saniyede 5 mesajdır.
-- Token, parola ve ham mesaj içeriği sunucu loglarına yazılmaz.
+- Token, parola ve ham mesaj içeriği sunucu loglarına yazılmaz; server logger bu tür attribute'ları `[REDACTED]` olarak filtreler.

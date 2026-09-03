@@ -42,7 +42,6 @@ erDiagram
 | `username` | unique; `^[a-z0-9_]{3,24}$` |
 | `password_hash` | Argon2id çıktısı |
 | `created_at` | sunucu UTC zamanı |
-| `last_seen_at` | son başarılı oturum/etkileşim zamanı |
 
 ### `rooms`
 

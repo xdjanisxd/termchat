@@ -125,7 +125,7 @@ The client keeps the `[ONLINE]`, `[CONNECTING]`, `[RECONNECTING]`, or `[OFFLINE]
 
 Do not append `/v1` or `/v1/ws` to the server URL; the client creates the required API and WebSocket paths automatically.
 
-TermChat keeps its JWT and selected theme only in the running application's memory. The default theme is `amber-crt`; closing the client resets any theme selection. You must log in each time the client starts, and no session file needs to be removed.
+TermChat keeps its JWT and selected theme only in the running application's memory. The default theme is `amber-crt`; closing the client resets any theme selection. You must log in each time the client starts, and no session file needs to be removed. Server-issued JWTs expire after one hour by default; a connection that needs to authenticate or reconnect after expiry requires a new login.
 
 ## Troubleshooting
 
