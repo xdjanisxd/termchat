@@ -21,7 +21,7 @@ func LoadServer(getenv func(string) string) (Server, error) {
 		ListenAddr:      getenv("TERMCHAT_LISTEN_ADDR"),
 		DatabaseURL:     getenv("TERMCHAT_DATABASE_URL"),
 		JWTSecret:       []byte(getenv("TERMCHAT_JWT_SECRET")),
-		TokenTTL:        24 * time.Hour,
+		TokenTTL:        time.Hour,
 		CleanupInterval: time.Hour,
 	}
 	if config.ListenAddr == "" {

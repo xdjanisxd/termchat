@@ -25,6 +25,22 @@ func TestLoadServerConfig(t *testing.T) {
 	}
 }
 
+func TestLoadServerUsesOneHourTokenTTLByDefault(t *testing.T) {
+	t.Parallel()
+
+	environment := map[string]string{
+		"TERMCHAT_DATABASE_URL": "postgres://localhost/termchat",
+		"TERMCHAT_JWT_SECRET":   "01234567890123456789012345678901",
+	}
+	config, err := LoadServer(func(key string) string { return environment[key] })
+	if err != nil {
+		t.Fatalf("LoadServer() error = %v", err)
+	}
+	if config.TokenTTL != time.Hour {
+		t.Fatalf("TokenTTL = %s, want 1h", config.TokenTTL)
+	}
+}
+
 func TestLoadServerConfigRequiresSecrets(t *testing.T) {
 	t.Parallel()
 
