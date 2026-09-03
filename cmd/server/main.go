@@ -15,13 +15,14 @@ import (
 
 	"termchat.local/termchat/internal/app"
 	"termchat.local/termchat/internal/config"
+	"termchat.local/termchat/internal/observability"
 	"termchat.local/termchat/internal/security"
 	postgresstore "termchat.local/termchat/internal/store/postgres"
 	"termchat.local/termchat/internal/transport/httpapi"
 )
 
 func main() {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	logger := slog.New(observability.NewRedactingHandler(slog.NewTextHandler(os.Stdout, nil)))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := run(ctx, os.Getenv, logger); err != nil {
