@@ -1,5 +1,7 @@
 # Terminal Chat Application
 
+> **Historical product brief — not the current roadmap.** This file records the original MVP exploration and intentionally contains superseded ideas such as a public lobby, room listing, alternative stacks, and pre-implementation TODOs. The repository code and `docs/` are authoritative; the current, source-reconciled roadmap is maintained in `C:/Users/gifted/Documents/hermes/Obsidian Vault/TermChat/Planning/08 - Roadmap Workspace.md`.
+
 ## 1. Proje Özeti
 
 Terminal üzerinden çalışan, gerçek zamanlı ve çok kullanıcılı bir chat uygulaması geliştirmek istiyorum.
