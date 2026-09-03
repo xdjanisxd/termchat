@@ -180,7 +180,7 @@ func (h *chatHub) inviteDirect(sender *chatClient, targetUsername string, now ti
 	if target == nil || target == sender {
 		return directInvite{}, nil, errInvalidDirectTarget
 	}
-	if sender.room() != "" || target.room() != "" || sender.direct() != "" || target.direct() != "" || h.hasInviteLocked(sender.identity.UserID) || h.hasInviteLocked(target.identity.UserID) {
+	if h.hasInviteLocked(sender.identity.UserID) || h.hasInviteLocked(target.identity.UserID) {
 		return directInvite{}, nil, errDirectContextBusy
 	}
 	invite := directInvite{id: uuid.NewString(), senderID: sender.identity.UserID, recipientID: target.identity.UserID, expiresAt: now.Add(directInviteTTL)}
@@ -205,17 +205,53 @@ func (h *chatHub) acceptDirect(recipient *chatClient, inviteID string, now time.
 		return directSession{}, nil, errInvalidDirectInvite
 	}
 	sender := h.users[invite.senderID]
-	if sender == nil || sender.room() != "" || recipient.room() != "" || sender.direct() != "" || recipient.direct() != "" {
+	if sender == nil {
 		delete(h.invites, inviteID)
 		h.mu.Unlock()
-		return directSession{}, nil, errDirectContextBusy
+		return directSession{}, nil, errInvalidDirectInvite
 	}
 	delete(h.invites, inviteID)
+
+	// Consent starts a new exclusive direct session. Both consenting people leave
+	// any current room or direct session atomically before the new session is live.
+	endedParticipants := make(map[*chatClient]struct{})
+	roomLeaves := make(map[string][]*chatClient)
+	for _, participant := range []*chatClient{sender, recipient} {
+		if session, exists := h.sessions[participant.direct()]; exists {
+			delete(h.sessions, session.id)
+			for _, userID := range []string{session.firstID, session.secondID} {
+				if peer := h.users[userID]; peer != nil {
+					peer.setDirect("")
+					endedParticipants[peer] = struct{}{}
+				}
+			}
+		}
+		if roomID := participant.room(); roomID != "" {
+			if clients := h.rooms[roomID]; clients != nil {
+				delete(clients, participant)
+				if len(clients) == 0 {
+					delete(h.rooms, roomID)
+				}
+			}
+			participant.setRoom("")
+			roomLeaves[roomID] = append(roomLeaves[roomID], participant)
+		}
+	}
+
 	session := directSession{id: uuid.NewString(), firstID: sender.identity.UserID, secondID: recipient.identity.UserID}
 	h.sessions[session.id] = session
 	sender.setDirect(session.id)
 	recipient.setDirect(session.id)
 	h.mu.Unlock()
+
+	for participant := range endedParticipants {
+		_ = participant.write(ServerEvent{Type: "direct_session_ended", Reason: "participant_left"})
+	}
+	for roomID, participants := range roomLeaves {
+		for _, participant := range participants {
+			h.broadcast(roomID, ServerEvent{Type: "user_left", Username: participant.identity.Username})
+		}
+	}
 	return session, sender, nil
 }
 

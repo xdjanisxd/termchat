@@ -136,7 +136,7 @@ Ek olaylar: `leave_room`, `create_room`, `change_room_password`, `delete_room`, 
 
 ## Ephemeral direct-chat sözleşmesi
 
-Direct chat oda oluşturmaz ve room/message persistence akışını kullanmaz. Başlatan ve hedef kullanıcı aynı anda online olmalıdır; hedef kabul etmeden mesaj iletimi başlamaz. Bir kullanıcı aynı anda yalnız bir direct invite veya direct chat bağlamında bulunabilir; direct chat sırasında room bağlamına geçmek, önce direct oturumu sonlandırır.
+Direct chat oda oluşturmaz ve room/message persistence akışını kullanmaz. Başlatan ve hedef kullanıcı aynı anda online olmalıdır; hedef kabul etmeden mesaj iletimi başlamaz. Oda veya başka bir direct chat içinde olan online kullanıcıya da direct invite ulaşır. Hedef kabul ederse, server iki kabul eden tarafı mevcut room/direct bağlamlarından atomik olarak çıkarır; varsa eski direct peer'e `direct_session_ended` gönderir ve ardından yeni exclusive direct session'ı başlatır. Bir kullanıcı aynı anda yalnız bir pending direct invite bağlamında bulunabilir.
 
 ```text
 client A -- direct_invite(target_username) --> server

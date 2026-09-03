@@ -247,7 +247,7 @@ func directError(requestID string, err error) ServerEvent {
 	case errors.Is(err, errInvalidDirectInvite):
 		return namedError(requestID, "INVALID_DIRECT_INVITE", "This direct invitation is no longer available to you.")
 	case errors.Is(err, errDirectContextBusy):
-		return namedError(requestID, "DIRECT_CONTEXT_BUSY", "One participant is already in a room, direct chat, or pending invitation.")
+		return namedError(requestID, "DIRECT_CONTEXT_BUSY", "One participant already has a pending direct invitation.")
 	case errors.Is(err, errNotInDirectSession):
 		return namedError(requestID, "NOT_IN_DIRECT_SESSION", "You are not in an active direct chat.")
 	default:

@@ -26,6 +26,21 @@ func TestDirectChatIsDiscardedOnConnectionLoss(t *testing.T) {
 	}
 }
 
+func TestDirectSessionStartReplacesRoomContext(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel(nil)
+	model.screen = ScreenChat
+	model.room = &domain.PublicRoom{ID: "room-1", Name: "private_room"}
+	model.messages = []domain.Message{{ID: "room-message", Content: "persistent room message"}}
+
+	model.applyServerEvent(protocol.ServerEvent{Type: "direct_session_started", DirectSessionID: "session-1", Counterpart: &protocol.DirectIdentity{UserID: "user-bob", Username: "bob"}})
+
+	if model.screen != ScreenChat || model.room != nil || model.directSessionID != "session-1" || model.direct == nil || model.direct.Username != "bob" || len(model.messages) != 0 {
+		t.Fatalf("room-to-direct transition = screen:%v room:%#v direct:%#v session:%q messages:%#v", model.screen, model.room, model.direct, model.directSessionID, model.messages)
+	}
+}
+
 func TestDirectInviteAcceptanceOpensEphemeralChatAndRendersCounterpart(t *testing.T) {
 	t.Parallel()
 
