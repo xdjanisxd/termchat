@@ -45,13 +45,13 @@ func (r *testUserRepository) DeleteUser(_ context.Context, userID string) error 
 	return store.ErrNotFound
 }
 
-func newTestAuthHandler() http.Handler {
+func newTestAuthHandler() *AuthHandler {
 	hasher := security.NewPasswordHasher(security.Argon2Params{
 		Memory: 8 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32,
 	})
 	tokens := security.NewTokenManager([]byte("01234567890123456789012345678901"), time.Hour)
 	service := app.NewAuthService(&testUserRepository{users: make(map[string]domain.User)}, hasher, tokens)
-	return NewAuthHandler(service).Routes()
+	return NewAuthHandler(service)
 }
 
 func TestAuthHandlerDeleteAccountRemovesIdentityAndRunsDisconnect(t *testing.T) {

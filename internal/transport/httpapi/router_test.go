@@ -37,6 +37,14 @@ func TestRouterHealthAndCurrentUser(t *testing.T) {
 	if meResponse.Code != http.StatusOK || meResponse.Body.String() != "{\"id\":\"user-1\",\"username\":\"alice\"}\n" {
 		t.Fatalf("me status = %d, body = %s", meResponse.Code, meResponse.Body.String())
 	}
+
+	deleteRequest := httptest.NewRequest(http.MethodDelete, "/v1/auth/account", nil)
+	deleteRequest.Header.Set("Authorization", "Bearer "+token)
+	deleteResponse := httptest.NewRecorder()
+	router.ServeHTTP(deleteResponse, deleteRequest)
+	if deleteResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("account deletion route status = %d, want %d", deleteResponse.Code, http.StatusUnauthorized)
+	}
 }
 
 func TestRouterProtectsWebSocket(t *testing.T) {

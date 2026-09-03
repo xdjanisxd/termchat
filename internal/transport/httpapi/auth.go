@@ -35,6 +35,10 @@ func NewAuthHandler(auth *app.AuthService, options ...any) *AuthHandler {
 	return handler
 }
 
+func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.Routes().ServeHTTP(w, r)
+}
+
 func (h *AuthHandler) Routes() http.Handler {
 	router := chi.NewRouter()
 	router.Post("/v1/auth/register", h.register)

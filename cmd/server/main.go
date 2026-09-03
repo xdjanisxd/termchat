@@ -59,7 +59,7 @@ func run(ctx context.Context, getenv func(string) string, logger *slog.Logger) e
 	attemptGuard := httpapi.NewAttemptGuard(attempts, serverConfig.TrustProxyHeaders)
 	chatHandler := httpapi.NewChatHandler(roomService, messageService, attemptGuard)
 	authHandler := httpapi.NewAuthHandler(authService, attemptGuard, chatHandler.DisconnectUser)
-	router := httpapi.NewRouter(authHandler.Routes(), httpapi.TokenMiddleware(tokens), chatHandler, pool.Ping, attemptGuard)
+	router := httpapi.NewRouter(authHandler, httpapi.TokenMiddleware(tokens), chatHandler, pool.Ping, attemptGuard)
 
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	defer stopWorker()
