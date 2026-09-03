@@ -24,6 +24,7 @@ var (
 type UserRepository interface {
 	CreateUser(ctx context.Context, user domain.User) error
 	UserByUsername(ctx context.Context, username string) (domain.User, error)
+	DeleteUser(ctx context.Context, userID string) error
 }
 
 type AuthResult struct {
@@ -67,6 +68,13 @@ func (s *AuthService) Login(ctx context.Context, username, password string, now 
 		return AuthResult{}, ErrInvalidCredentials
 	}
 	return s.issue(user, now)
+}
+
+func (s *AuthService) DeleteAccount(ctx context.Context, userID string) error {
+	if err := s.users.DeleteUser(ctx, userID); err != nil {
+		return fmt.Errorf("delete account: %w", err)
+	}
+	return nil
 }
 
 func (s *AuthService) issue(user domain.User, now time.Time) (AuthResult, error) {

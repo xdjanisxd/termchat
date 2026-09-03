@@ -44,6 +44,10 @@ type eventSentMsg struct {
 	err error
 }
 
+type deleteAccountMsg struct {
+	err error
+}
+
 type serverEventMsg struct {
 	event protocol.ServerEvent
 	err   error
@@ -247,6 +251,13 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.handleConnectionLoss("Could not send chat event: " + msg.err.Error())
 		}
 		return m, nil
+	case deleteAccountMsg:
+		if msg.err != nil {
+			m.setStatus(statusError, "Account could not be deleted: "+msg.err.Error())
+			return m, nil
+		}
+		_ = m.api.Disconnect()
+		return m, tea.Quit
 	case serverEventMsg:
 		if msg.err != nil {
 			return m, m.handleConnectionLoss("Connection lost: " + msg.err.Error())
@@ -498,6 +509,12 @@ func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 		})
 	case CommandDeleteRoom:
 		return m, m.sendEventCmd(protocol.ClientEvent{Type: "delete_room", RequestID: uuid.NewString()})
+	case CommandDeleteAccount:
+		if len(command.Args) != 1 || command.Args[0] != "confirm" {
+			m.setStatus(statusWarning, "This permanently deletes your account, owned rooms, and your messages. Type /deleteaccount confirm to continue.")
+			return m, nil
+		}
+		return m, m.deleteAccountCmd()
 	case CommandTheme:
 		if len(command.Args) == 0 {
 			m.commandInput.SetValue("/theme")
@@ -708,6 +725,14 @@ func (m *Model) focusCommandInput() {
 		m.commandInput.Placeholder = "/join private_room"
 	}
 	m.commandInput.Focus()
+}
+
+func (m *Model) deleteAccountCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		return deleteAccountMsg{err: m.api.DeleteAccount(ctx)}
+	}
 }
 
 func (m *Model) authenticateCmd(register bool, username, password string) tea.Cmd {

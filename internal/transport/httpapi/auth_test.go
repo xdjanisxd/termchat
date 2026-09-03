@@ -35,6 +35,16 @@ func (r *testUserRepository) UserByUsername(_ context.Context, username string) 
 	return user, nil
 }
 
+func (r *testUserRepository) DeleteUser(_ context.Context, userID string) error {
+	for username, user := range r.users {
+		if user.ID == userID {
+			delete(r.users, username)
+			return nil
+		}
+	}
+	return store.ErrNotFound
+}
+
 func newTestAuthHandler() http.Handler {
 	hasher := security.NewPasswordHasher(security.Argon2Params{
 		Memory: 8 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32,
@@ -42,6 +52,30 @@ func newTestAuthHandler() http.Handler {
 	tokens := security.NewTokenManager([]byte("01234567890123456789012345678901"), time.Hour)
 	service := app.NewAuthService(&testUserRepository{users: make(map[string]domain.User)}, hasher, tokens)
 	return NewAuthHandler(service).Routes()
+}
+
+func TestAuthHandlerDeleteAccountRemovesIdentityAndRunsDisconnect(t *testing.T) {
+	t.Parallel()
+
+	repository := &testUserRepository{users: map[string]domain.User{"alice": {ID: "user-1", Username: "alice"}}}
+	service := app.NewAuthService(repository, security.NewPasswordHasher(security.Argon2Params{}), security.NewTokenManager([]byte("01234567890123456789012345678901"), time.Hour))
+	disconnected := ""
+	handler := NewAuthHandler(service, func(userID string) { disconnected = userID })
+	request := httptest.NewRequest(http.MethodDelete, "/v1/auth/account", nil)
+	request = request.WithContext(context.WithValue(request.Context(), identityContextKey{}, Identity{UserID: "user-1", Username: "alice"}))
+	response := httptest.NewRecorder()
+
+	handler.DeleteAccount(response, request)
+
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("delete account status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if disconnected != "user-1" {
+		t.Fatalf("disconnected user = %q, want user-1", disconnected)
+	}
+	if _, exists := repository.users["alice"]; exists {
+		t.Fatal("account was not deleted")
+	}
 }
 
 func TestAuthHandlerRegisterAndLogin(t *testing.T) {

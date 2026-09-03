@@ -71,6 +71,28 @@ func (c *Client) Login(ctx context.Context, username, password string) (Session,
 	return c.authenticate(ctx, "/v1/auth/login", username, password)
 }
 
+func (c *Client) DeleteAccount(ctx context.Context) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.baseURL+"/v1/auth/account", nil)
+	if err != nil {
+		return fmt.Errorf("create delete-account request: %w", err)
+	}
+	token := c.Token()
+	if token == "" {
+		return ErrNotAuthenticated
+	}
+	request.Header.Set("Authorization", "Bearer "+token)
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("delete account: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusNoContent {
+		return &APIError{Status: response.StatusCode, Code: "ACCOUNT_DELETE_FAILED", Message: "The account could not be deleted."}
+	}
+	c.SetToken("")
+	return nil
+}
+
 func (c *Client) Token() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

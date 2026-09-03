@@ -41,6 +41,7 @@ var helpSections = []helpSection{
 		{usage: "/deleteroom", description: "Delete the current room"},
 	}},
 	{title: "APP", commands: []helpCommand{
+		{usage: "/deleteaccount confirm", description: "Permanently delete your account, owned rooms, and authored messages"},
 		{usage: "/help", description: "Show this screen"},
 		{usage: "/theme [theme-name]", description: "Tab/Shift+Tab select, Enter apply, Esc cancel; or choose directly: " + strings.Join(themeNames(), ", ")},
 		{usage: "/q", description: "Quit TermChat"},

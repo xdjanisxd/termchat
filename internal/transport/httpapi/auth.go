@@ -17,14 +17,20 @@ import (
 const maxRequestBody = 1 << 20
 
 type AuthHandler struct {
-	auth     *app.AuthService
-	attempts *AttemptGuard
+	auth           *app.AuthService
+	attempts       *AttemptGuard
+	disconnectUser func(string)
 }
 
-func NewAuthHandler(auth *app.AuthService, attempts ...*AttemptGuard) *AuthHandler {
+func NewAuthHandler(auth *app.AuthService, options ...any) *AuthHandler {
 	handler := &AuthHandler{auth: auth}
-	if len(attempts) > 0 {
-		handler.attempts = attempts[0]
+	for _, option := range options {
+		switch value := option.(type) {
+		case *AttemptGuard:
+			handler.attempts = value
+		case func(string):
+			handler.disconnectUser = value
+		}
 	}
 	return handler
 }
@@ -39,6 +45,26 @@ func (h *AuthHandler) Routes() http.Handler {
 type credentialsRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	identity, ok := IdentityFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required.")
+		return
+	}
+	if err := h.auth.DeleteAccount(r.Context(), identity.UserID); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication is required.")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "The server could not complete the request.")
+		return
+	}
+	if h.disconnectUser != nil {
+		h.disconnectUser(identity.UserID)
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *AuthHandler) register(w http.ResponseWriter, r *http.Request) {
