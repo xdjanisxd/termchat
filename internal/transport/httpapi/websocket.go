@@ -2,12 +2,12 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/coder/websocket/wsjson"
 	"github.com/google/uuid"
 
 	"termchat.local/termchat/internal/app"
@@ -22,6 +22,8 @@ type ChatHandler struct {
 	hub      *chatHub
 	attempts *AttemptGuard
 }
+
+const maxWebSocketMessageBytes = 16 * 1024
 
 func NewChatHandler(rooms *app.RoomService, messages *app.MessageService, attempts ...*AttemptGuard) *ChatHandler {
 	handler := &ChatHandler{rooms: rooms, messages: messages, hub: newChatHub()}
@@ -45,7 +47,7 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	conn.SetReadLimit(16 * 1024)
+	conn.SetReadLimit(maxWebSocketMessageBytes)
 	client := &chatClient{conn: conn, identity: identity}
 	if h.attempts != nil {
 		client.clientIP = h.attempts.clientIP(r)
@@ -57,12 +59,35 @@ func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	for {
-		var event ClientEvent
-		if err := wsjson.Read(r.Context(), conn, &event); err != nil {
+		event, err := readClientEvent(r.Context(), conn)
+		if err != nil {
 			return
 		}
 		h.handle(client, event)
 	}
+}
+
+func readClientEvent(ctx context.Context, conn *websocket.Conn) (ClientEvent, error) {
+	messageType, payload, err := conn.Read(ctx)
+	if err != nil {
+		return ClientEvent{}, err
+	}
+	return decodeWebSocketClientEvent(messageType, payload)
+}
+
+func decodeWebSocketClientEvent(messageType websocket.MessageType, payload []byte) (ClientEvent, error) {
+	if messageType != websocket.MessageText {
+		return ClientEvent{}, errors.New("client event must be a text message")
+	}
+	return decodeClientEventPayload(payload)
+}
+
+func decodeClientEventPayload(payload []byte) (ClientEvent, error) {
+	var event ClientEvent
+	if err := json.Unmarshal(payload, &event); err != nil {
+		return ClientEvent{}, err
+	}
+	return event, nil
 }
 
 func (h *ChatHandler) handle(client *chatClient, event ClientEvent) {

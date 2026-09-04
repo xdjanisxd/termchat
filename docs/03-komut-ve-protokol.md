@@ -67,6 +67,8 @@ client -- send_message(content) --> server
 server -- new_message(message) --> room subscribers
 ```
 
+İstemci olayları en fazla 16 KiB UTF-8 WebSocket text frame içinde geçerli JSON olmalıdır. Binary frame, boyut aşımı veya geçersiz JSON için sunucu olay üretmeden bağlantıyı kapatır; istemci normal reconnect politikasını uygular.
+
 ## JSON olay sözleşmesi
 
 ### İstemci → sunucu
