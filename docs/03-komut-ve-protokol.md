@@ -1,46 +1,46 @@
-# TermChat — TUI Komutları ve İstemci–Sunucu Protokolü
+# TermChat — TUI Commands and Client–Server Protocol
 
-## TUI kullanıcı akışı
+## TUI user flow
 
 ```mermaid
 flowchart TD
   START[termchat] --> AUTH[Login / Register]
-  AUTH --> HOME[Komut ekranı]
-  HOME -->|/createroom ad parola| CREATE[Oda oluştur ve otomatik katıl]
-  HOME -->|/join oda-adı| PROMPT[Maskeli oda parolası iste]
-  HOME -->|/dm kullanıcı| DIRECT_INVITE[60 sn'lik direct invite]
+  AUTH --> HOME[Command screen]
+  HOME -->|/createroom name password| CREATE[Create and join private room]
+  HOME -->|/join room-name| PROMPT[Request masked room password]
+  HOME -->|/dm username| DIRECT_INVITE[60-second direct invitation]
   DIRECT_INVITE -->|/accept| DIRECT_CHAT[Ephemeral 1:1 chat]
-  DIRECT_INVITE -->|/decline veya süre dolumu| HOME
-  DIRECT_CHAT -->|/l, ayrılma veya bağlantı kopması| HOME
-  PROMPT -->|doğru| CHAT[Sohbet ekranı + son 50 mesaj]
-  PROMPT -->|yanlış| HOME
+  DIRECT_INVITE -->|/decline or expiry| HOME
+  DIRECT_CHAT -->|/l, leave, or disconnect| HOME
+  PROMPT -->|valid password| CHAT[Chat screen + latest 50 messages]
+  PROMPT -->|invalid password| HOME
   CREATE --> CHAT
   CHAT -->|/l| HOME
-  CHAT -->|/roompasswd yeni-parola| CHANGE[Sunucu sahibi doğrulaması]
-  CHAT -->|/deleteroom| DELETE[Sunucu sahibi doğrulaması + onay]
+  CHAT -->|/roompasswd new-password| CHANGE[Owner authorization]
+  CHAT -->|/deleteroom| DELETE[Owner authorization + confirmation]
   CHANGE --> CHAT
   DELETE --> HOME
 ```
 
-## MVP komutları
+## Commands
 
-| Komut | Bağlam | Davranış |
+| Command | Context | Behavior |
 |---|---|---|
-| `/help` | her yer | kullanılabilir komutları gösterir |
-| `/createroom <oda-adı> <oda-parolası>` | ana ekran | oda oluşturur ve kullanıcıyı odaya alır |
-| `/join <oda-adı>` | ana ekran | maskeli parola istemi açar; parolayı terminal geçmişine yazmaz |
-| `/dm <kullanıcı-adı>` | ana ekran | online kullanıcıya 60 sn geçerli, kabul gerektiren direct-chat daveti yollar |
-| `/accept` | ana ekran | bekleyen direct-chat davetini kabul eder |
-| `/decline` | ana ekran | bekleyen direct-chat davetini reddeder |
-| `/l` | oda/direct chat | odayı veya aktif ephemeral direct chat'i terk eder |
-| `/who` | oda | o an WebSocket ile bağlı oda kullanıcılarını gösterir |
-| `/roompasswd <yeni-parola>` | oda sahibi | oda parolasını değiştirir |
-| `/deleteroom` | oda sahibi | açık onaydan sonra oda ve mesajlarını siler |
-| `/deleteaccount confirm` | her yer | hesabı, kullanıcıya ait tüm kalıcı mesajları ve sahip olduğu room'ları geri döndürülemez biçimde siler; aktif bağlantıyı kapatır |
-| `/theme [tema-adı]` | ana ekran veya oda | argümansız kullanımda `Tab`/`Shift+Tab` ile gezinilen, `Enter` ile uygulanan ve `Esc` ile kapatılan tema seçiciyi açar; tema adı verilirse doğrudan değiştirir. `amber-crt`, `green-crt`, `ice-blue`, `synthwave`, `cyberpunk` desteklenir |
-| `/q` | her yer | istemciyi kapatır |
+| `/help` | Anywhere | Shows available commands |
+| `/createroom <room-name> <room-password>` | Home | Creates a private room and joins it |
+| `/join <room-name>` | Home | Opens a masked password prompt; never writes the password to terminal history |
+| `/dm <username>` | Home | Sends an online user a consent-based direct-chat invitation that expires after 60 seconds |
+| `/accept` | Home | Accepts a pending direct-chat invitation |
+| `/decline` | Home | Declines a pending direct-chat invitation |
+| `/l` | Room/direct chat | Leaves the room or active ephemeral direct chat |
+| `/who` | Room | Shows users currently connected to the room through WebSocket |
+| `/roompasswd <new-password>` | Room owner | Changes the room password |
+| `/deleteroom` | Room owner | Deletes the room and its messages after explicit confirmation |
+| `/deleteaccount confirm` | Anywhere | Irreversibly deletes the account, its persistent messages, and rooms it owns, then closes the active connection |
+| `/theme [theme-name]` | Home or room | Opens the picker with no argument (`Tab`/`Shift+Tab`, `Enter`, `Esc`) or changes directly by name; supported themes are `amber-crt`, `green-crt`, `ice-blue`, `synthwave`, and `cyberpunk` |
+| `/q` | Anywhere | Closes the client |
 
-Varsayılan tema `amber-crt`'dir. Tema seçimi sunucuya gönderilmez ve diske yazılmaz; client yeniden başlatıldığında varsayılana döner.
+The default theme is `amber-crt`. Theme selection is neither sent to the server nor written to disk; restarting the client restores the default.
 
 ## REST API
 
@@ -53,9 +53,9 @@ GET  /v1/rooms/{room_id}/messages?before={message_id}&limit=50
 GET  /healthz
 ```
 
-`register` ve `login` başarılı olduğunda istemciye JWT döner. REST ve WebSocket isteklerinde token doğrulaması zorunludur.
+Successful `register` and `login` requests return a JWT. Token validation is required for REST and WebSocket requests.
 
-## WebSocket yaşam döngüsü
+## WebSocket lifecycle
 
 ```text
 client -- WSS + JWT --> server
@@ -67,17 +67,17 @@ client -- send_message(content) --> server
 server -- new_message(message) --> room subscribers
 ```
 
-İstemci olayları en fazla 16 KiB UTF-8 WebSocket text frame içinde geçerli JSON olmalıdır. Binary frame, boyut aşımı veya geçersiz JSON için sunucu olay üretmeden bağlantıyı kapatır; istemci normal reconnect politikasını uygular.
+Client events must be valid JSON in a UTF-8 WebSocket text frame no larger than 16 KiB. The server closes the connection without producing a server event for a binary frame, an oversized frame, or invalid JSON; the client follows its normal reconnect policy.
 
-## JSON olay sözleşmesi
+## JSON event contract
 
-### İstemci → sunucu
+### Client → server
 
 ```json
 {
   "type": "join_room",
   "request_id": "0df4d4eb-5691-478a-a22d-9c7f1cbfed2e",
-  "room_name": "ekip_1",
+  "room_name": "team_1",
   "password": "only-sent-over-tls"
 }
 ```
@@ -87,21 +87,21 @@ server -- new_message(message) --> room subscribers
   "type": "send_message",
   "request_id": "b77e7d21-3ba7-43c8-987d-4bec63f81d00",
   "room_id": "a UUID",
-  "content": "Merhaba"
+  "content": "Hello"
 }
 ```
 
-Ek olaylar: `leave_room`, `create_room`, `change_room_password`, `delete_room`, `load_history`.
+Other room events are `leave_room`, `create_room`, `change_room_password`, `delete_room`, and `load_history`.
 
-`load_history` yalnızca istemcinin o anda katıldığı oda için çalışır. `before_message_id`, zaten gösterilen en eski mesajdır; sunucu bu mesajdan daha eski en fazla 50 mesajı kronolojik sırayla döndürür.
+`load_history` works only for the room the client has currently joined. `before_message_id` is the oldest message already displayed; the server returns up to 50 older messages in chronological order.
 
-### Sunucu → istemci
+### Server → client
 
 ```json
 {
   "type": "room_joined",
   "request_id": "0df4d4eb-5691-478a-a22d-9c7f1cbfed2e",
-  "room": {"id": "a UUID", "name": "ekip_1"},
+  "room": {"id": "a UUID", "name": "team_1"},
   "messages": [],
   "has_more": true
 }
@@ -123,7 +123,7 @@ Ek olaylar: `leave_room`, `create_room`, `change_room_password`, `delete_room`, 
     "id": "a UUID",
     "room_id": "a UUID",
     "user": {"id": "a UUID", "username": "alice"},
-    "content": "Merhaba",
+    "content": "Hello",
     "created_at": "2026-08-26T15:42:00Z"
   }
 }
@@ -134,13 +134,13 @@ Ek olaylar: `leave_room`, `create_room`, `change_room_password`, `delete_room`, 
   "type": "error",
   "request_id": "optional request UUID",
   "code": "INVALID_ROOM_PASSWORD",
-  "message": "Odaya katılım başarısız."
+  "message": "Could not join the room."
 }
 ```
 
-## Ephemeral direct-chat sözleşmesi
+## Ephemeral direct-chat contract
 
-Direct chat oda oluşturmaz ve room/message persistence akışını kullanmaz. Başlatan ve hedef kullanıcı aynı anda online olmalıdır; hedef kabul etmeden mesaj iletimi başlamaz. Oda veya başka bir direct chat içinde olan online kullanıcıya da direct invite ulaşır. Hedef kabul ederse, server iki kabul eden tarafı mevcut room/direct bağlamlarından atomik olarak çıkarır; varsa eski direct peer'e `direct_session_ended` gönderir ve ardından yeni exclusive direct session'ı başlatır. Bir kullanıcı aynı anda yalnız bir pending direct invite bağlamında bulunabilir. Hedefin varlığı, online durumu veya pending-invite durumu gizlidir: teslim edilemeyen invite'lar başlatana yalnız `DIRECT_UNAVAILABLE` / `Direct invitation could not be delivered.` sonucu döndürür.
+Direct chat does not create a room and does not use the room/message persistence path. Both participants must be online; no message delivery begins until the recipient accepts. An online user can receive an invitation while in a room or another direct chat. On acceptance, the server atomically removes both participants from their current room or direct context, sends `direct_session_ended` to a replaced peer when applicable, and starts a new exclusive direct session. An account may have only one pending direct invitation at a time. Target existence, online state, and pending-invitation state are private: a delivery failure returns only `DIRECT_UNAVAILABLE` / `Direct invitation could not be delivered.`
 
 ```text
 client A -- direct_invite(target_username) --> server
@@ -153,23 +153,23 @@ client -- leave_direct --> server
 server -- direct_session_ended(reason) --> A + B
 ```
 
-Invite'lar 60 saniye sonra sona erer; `direct_invite_declined`, `direct_invite_expired` ve `direct_invite_cancelled` olayları ilgili istemciye gönderilir. Direct mesajlar PostgreSQL'e yazılmaz, REST history endpoint'iyle alınamaz ve sunucunun yeniden başlaması, bağlantının kopması veya bir tarafın ayrılmasıyla bellekten silinir. Mesaj biçimi ve kullanıcı başına 2 saniyede 5 mesaj sınırı room mesajlarıyla aynıdır.
+Invitations expire after 60 seconds; the server sends `direct_invite_declined`, `direct_invite_expired`, or `direct_invite_cancelled` to the relevant client. Direct messages are never written to PostgreSQL, are unavailable through the REST history endpoint, and are removed from memory when the server restarts, either participant disconnects, or either participant leaves. Their format and per-user limit of five messages per two seconds match room messages.
 
-İstemci olayları: `direct_invite` (`target_username`), `direct_invite_accept` (`invite_id`), `direct_invite_decline` (`invite_id`), `send_direct_message` (`content`) ve `leave_direct`.
+Direct-chat client events are `direct_invite` (`target_username`), `direct_invite_accept` (`invite_id`), `direct_invite_decline` (`invite_id`), `send_direct_message` (`content`), and `leave_direct`.
 
-Sunucu olayları: `direct_invite_sent`, `direct_invite_received`, `direct_invite_declined`, `direct_invite_expired`, `direct_invite_cancelled`, `direct_session_started`, `new_direct_message`, `direct_session_ended`.
+Direct-chat server events are `direct_invite_sent`, `direct_invite_received`, `direct_invite_declined`, `direct_invite_expired`, `direct_invite_cancelled`, `direct_session_started`, `new_direct_message`, and `direct_session_ended`.
 
-## İstemci bildirim modeli
+## Client notification model
 
-Bağlantı durumu header'da kalıcı `[ONLINE]`, `[CONNECTING]`, `[RECONNECTING]` veya `[OFFLINE]` rozetiyle gösterilir. 45 saniyelik heartbeat'in başarılı `pong` yanıtı kullanıcıya bildirim üretmez; yalnız timeout veya reconnect gibi durum değişiklikleri görünür olur.
+The header persistently shows `[ONLINE]`, `[CONNECTING]`, `[RECONNECTING]`, or `[OFFLINE]`. A successful 45-second heartbeat `pong` produces no user notification; only state changes such as a timeout or reconnect become visible.
 
-Normal `[INFO]`, `[OK]`, `[WARN]` ve `[ERROR]` mesajları sağ üstte tek bir timed toast olarak gösterilir ve otomatik kaybolur; yeni normal mesaj görünür toast'ı değiştirir. Süreler: bilgi/başarı 4 saniye, uyarı 8 saniye ve hata 12 saniye. `direct_invite_received` ayrı bir `[INVITE]` action banner'ıdır: `/accept`, `/decline` veya invite expiry olana kadar görünür kalır ve normal toast'lar ile heartbeat tarafından ezilemez.
+Normal `[INFO]`, `[OK]`, `[WARN]`, and `[ERROR]` messages appear as a single timed toast in the top-right corner and disappear automatically. A newer normal message replaces the visible toast. Durations are 4 seconds for information/success, 8 seconds for warnings, and 12 seconds for errors. `direct_invite_received` is a separate `[INVITE]` action banner that remains visible until `/accept`, `/decline`, or expiry and cannot be replaced by normal toasts or heartbeat traffic.
 
-## Güvenlik kuralları
+## Security rules
 
-- JWT yalnızca TLS/WSS üzerinden taşınır ve varsayılan olarak 1 saat sonra sona erer; süresi biten token ile yeni bir kimlik doğrulama veya reconnect için tekrar login gerekir.
-- Kullanıcı ve oda parolaları Argon2id ile hashlenir.
-- `/join` oda parolasını komut argümanı olarak almaz; maskeli input kullanır.
-- Sunucu; mesaj uzunluğu, isim formatı ve yetki kontrolünü uygular.
-- Mesaj hız sınırı kullanıcı başına 2 saniyede 5 mesajdır.
-- Token, parola ve ham mesaj içeriği sunucu loglarına yazılmaz; server logger bu tür attribute'ları `[REDACTED]` olarak filtreler.
+- JWTs travel only through TLS/WSS and expire after one hour by default; a user must log in again when a new authentication or reconnect needs an expired token.
+- User and room passwords are hashed with Argon2id.
+- `/join` never accepts a room password as a command argument; it uses masked input.
+- The server enforces message length, name format, and authorization.
+- The message rate limit is five messages per user every two seconds.
+- Tokens, passwords, and raw message content are not written to server logs; the server logger filters these attributes as `[REDACTED]`.

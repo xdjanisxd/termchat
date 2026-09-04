@@ -1,6 +1,6 @@
-# TermChat — Veri Modeli ve Saklama Şeması
+# TermChat — Data Model and Retention Schema
 
-## İlişki şeması
+## Relationship diagram
 
 ```mermaid
 erDiagram
@@ -13,7 +13,6 @@ erDiagram
     varchar username UK
     text password_hash
     timestamptz created_at
-    timestamptz last_seen_at
   }
   ROOMS {
     uuid id PK
@@ -32,41 +31,41 @@ erDiagram
   }
 ```
 
-## Tablolar
+## Tables
 
 ### `users`
 
-| Alan | Kural |
+| Field | Rule |
 |---|---|
-| `id` | UUID, primary key |
-| `username` | unique; `^[a-z0-9_]{3,24}$` |
-| `password_hash` | Argon2id çıktısı |
-| `created_at` | sunucu UTC zamanı |
+| `id` | UUID primary key |
+| `username` | Unique; `^[a-z0-9_]{3,24}$` |
+| `password_hash` | Argon2id output |
+| `created_at` | Server-assigned UTC time |
 
 ### `rooms`
 
-| Alan | Kural |
+| Field | Rule |
 |---|---|
-| `id` | UUID, primary key |
-| `name` | unique; `^[a-z0-9_-]{3,32}$` |
-| `password_hash` | Argon2id çıktısı; düz metin asla yok |
-| `created_by` | `users.id` foreign key; oda sahibi |
-| `created_at` | sunucu UTC zamanı |
+| `id` | UUID primary key |
+| `name` | Unique; `^[a-z0-9_-]{3,32}$` |
+| `password_hash` | Argon2id output; never plaintext |
+| `created_by` | `users.id` foreign key; room owner |
+| `created_at` | Server-assigned UTC time |
 
-Odayı oluşturan kişi otomatik olarak sahibidir. Sahip yalnızca oda parolasını değiştirebilir ve odayı silebilir. Oda silinince ilişkili mesajlar da silinir.
+The creator is automatically the owner. Only the owner may change a room password or delete the room. Deleting a room also deletes its related messages.
 
 ### `messages`
 
-| Alan | Kural |
+| Field | Rule |
 |---|---|
-| `id` | UUID, primary key; istemci tekrarlarını elemek için kullanılır |
+| `id` | UUID primary key; used to suppress client duplicates |
 | `room_id` | `rooms.id` foreign key |
 | `user_id` | `users.id` foreign key |
-| `content` | 1–2.000 karakter; terminal kontrol dizileri temizlenir/engellenir |
-| `created_at` | sunucu tarafından atanmış UTC zamanı |
-| `expires_at` | `created_at + retention_period`; temizleme işi bu değere göre siler |
+| `content` | 1–2,000 characters; terminal control sequences are sanitized or rejected |
+| `created_at` | Server-assigned UTC time |
+| `expires_at` | `created_at + retention_period`; cleanup deletes by this value |
 
-## İndeksler
+## Indexes
 
 ```text
 users(username) UNIQUE
@@ -75,6 +74,8 @@ messages(room_id, created_at DESC, id DESC)
 messages(expires_at)
 ```
 
-## Saklama politikası
+## Retention policy
 
-Mesajlar süresiz tutulmaz. Her mesaj oluşturulduktan sonra **1 hafta (7 gün)** saklanır. `expires_at`, `created_at + 7 gün` olarak atanır; sunucu periyodik olarak `expires_at <= now()` kayıtlarını kalıcı biçimde siler. Süre, MVP’de tüm odalar için sabittir; oda bazlı retention MVP dışıdır.
+Room messages are not retained indefinitely. Each message is stored for **one week (7 days)** after creation. `expires_at` is set to `created_at + 7 days`, and the server periodically and permanently deletes records where `expires_at <= now()`. The duration is fixed for every room; room-specific retention is outside the product scope.
+
+Direct messages are not stored in PostgreSQL and have no history. They exist only in the memory of an active direct session and disappear when either participant leaves or disconnects, or when the server restarts.

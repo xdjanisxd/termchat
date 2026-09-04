@@ -1,19 +1,20 @@
-# TermChat — Genel Mimari Şeması
+# TermChat — General Architecture
 
-## Hedef
+## Purpose
 
-TermChat, Windows ve Linux terminallerinde çalışan, kullanıcı hesaplı, oda parolalı ve gerçek zamanlı bir sohbet uygulamasıdır. Oda listeleri public değildir; kullanıcılar oda adını ve parolasını bilerek katılır.
+TermChat is a real-time chat application for Windows, Linux, and Apple Silicon macOS terminals. It uses pseudonymous user accounts and password-protected private rooms. There is no public room directory: a user must know both a room name and its password to join.
 
-## Bileşenler
+## Components
 
 ```mermaid
 flowchart TB
   A[Windows Terminal Client\ntermchat.exe] -->|HTTPS REST + WSS| S[Go Chat Server]
   B[Linux Terminal Client\ntermchat] -->|HTTPS REST + WSS| S
+  C[macOS arm64 Terminal Client\ntermchat-darwin-arm64] -->|HTTPS REST + WSS| S
 
   S --> AUTH[Authentication\nArgon2id + JWT]
   S --> ROOM[Room Service\ncreate/join/owner actions]
-  S --> RT[WebSocket Hub\nroom broadcasting]
+  S --> RT[WebSocket Hub\nroom and direct-session events]
   S --> MSG[Message Service\npersistence + retention]
 
   AUTH --> DB[(PostgreSQL)]
@@ -23,29 +24,31 @@ flowchart TB
   CLEAN[Retention cleanup job] --> DB
 ```
 
-## Sunucu sorumlulukları
+## Server responsibilities
 
-- Kayıt ve login işlemleri
-- JWT oluşturma ve doğrulama
-- Oda oluşturma, oda parolası doğrulama, parola değiştirme ve silme
-- WebSocket bağlantılarının kimlik doğrulaması ve room bazında yönetimi
-- Mesaj doğrulama, kalıcılık ve yayınlama
-- Kullanıcı başına mesaj hız sınırı
-- Süresi dolan mesajların periyodik temizliği
+- Register and authenticate users.
+- Issue and validate JWTs.
+- Create private rooms, validate room passwords, change room passwords, and delete rooms.
+- Enforce owner-only room actions and consent-based room invitations.
+- Authenticate and manage WebSocket connections and room/direct-session membership.
+- Validate, persist, and broadcast room messages.
+- Enforce per-user message rate limits.
+- Apply login and room-password attempt locks.
+- Periodically delete expired messages.
 
-## İstemci sorumlulukları
+## Client responsibilities
 
-- Kullanıcı giriş/kayıt deneyimi
-- Token'ı ilk sürümde yerel uygulama verisinde saklama
-- Oda oluşturma ve `/join <oda-adı>` akışı
-- Parolayı maskeli TUI alanında girme
-- Son 50 mesajı gösterme, yeni mesajları canlı ekleme ve komutları işleme
-- Her 45 saniyede uygulama-seviyesi WebSocket heartbeat gönderme; cevap gelmezse yeniden bağlanma
-- Bağlantı kesildiğinde kullanıcıyı bilgilendirme ve son odasına yalnız süreç belleğinde tutulan oda parolasıyla yeniden katılma
+- Provide registration and login flows.
+- Keep JWTs, room passwords, invitation state, and message state in process memory only.
+- Create rooms and run the `/join <room-name>` flow.
+- Collect room passwords through masked TUI input.
+- Show the latest 50 messages, append live messages, and handle commands.
+- Send an application-level WebSocket heartbeat every 45 seconds and reconnect after connection loss.
+- Rejoin the last room only with the room password held in process memory; clear it when rejoin fails.
 
-## Çapraz platform prensipleri
+## Cross-platform principles
 
-- Tek Go kod tabanından `GOOS=windows` ve `GOOS=linux` derlemesi alınır.
-- TUI; terminal boyutu değişimi, Unicode kullanıcı/metin içeriği ve Windows/Linux giriş davranışlarıyla test edilir.
-- Terminal input'u ile mesaj akışı Bubble Tea olay döngüsünde ayrıştırılır; gelen mesaj yazılan metni bozmaz.
-- Platforma özgü shell komutlarına veya dosya yollarına istemci iş mantığında bağımlılık oluşturulmaz.
+- Build native clients from one Go codebase for Windows amd64, Linux amd64, and macOS arm64.
+- Test terminal resizing, Unicode content, and Windows/Linux input behavior.
+- Keep terminal input and incoming message handling separate in the Bubble Tea event loop so incoming messages never corrupt composition text.
+- Do not depend on platform-specific shell commands or file paths in client business logic.
