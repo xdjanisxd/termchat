@@ -24,7 +24,7 @@ CREATE TABLE messages (
     created_at TIMESTAMPTZ NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT messages_content_length CHECK (char_length(content) BETWEEN 1 AND 2000),
-    CONSTRAINT messages_retention CHECK (expires_at = created_at + INTERVAL '7 days')
+    CONSTRAINT messages_retention CHECK (expires_at = created_at + INTERVAL '30 minutes')
 );
 
 CREATE INDEX messages_room_created_idx ON messages (room_id, created_at DESC, id DESC);

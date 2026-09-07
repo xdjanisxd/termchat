@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -129,6 +130,19 @@ func (r *wsMessageRepository) MessagesBefore(_ context.Context, roomID, beforeMe
 	return append([]domain.Message(nil), messages[start:end]...), nil
 }
 
+func (r *wsMessageRepository) DeleteMessagesByUserInRoom(_ context.Context, roomID, userID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	kept := r.messages[:0]
+	for _, message := range r.messages {
+		if message.RoomID != roomID || message.UserID != userID {
+			kept = append(kept, message)
+		}
+	}
+	r.messages = kept
+	return nil
+}
+
 func TestChatHandlerLoadsOlderMessageHistoryForTheCurrentRoom(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -214,6 +228,100 @@ func TestChatHandlerCreatesJoinsAndBroadcasts(t *testing.T) {
 	defer messageRepository.mu.Unlock()
 	if len(messageRepository.messages) != 1 {
 		t.Fatalf("persisted messages = %d, want 1", len(messageRepository.messages))
+	}
+}
+
+func TestChatHandlerPanicRemovesOnlyTheRequestingMemberMessages(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	hasher := security.NewPasswordHasher(security.Argon2Params{Memory: 8 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32})
+	roomRepository := newWSRoomRepository()
+	messageRepository := &wsMessageRepository{}
+	chat := NewChatHandler(app.NewRoomService(roomRepository, hasher), app.NewMessageService(messageRepository))
+	tokens := security.NewTokenManager([]byte("01234567890123456789012345678901"), time.Hour)
+	router := chi.NewRouter()
+	router.With(TokenMiddleware(tokens)).Get("/v1/ws", chat.ServeHTTP)
+	server := httptest.NewServer(router)
+	defer server.Close()
+	websocketURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/ws"
+
+	ownerToken, _ := tokens.Issue("owner-1", "alice", time.Now().UTC())
+	memberToken, _ := tokens.Issue("user-2", "bob", time.Now().UTC())
+	owner := dialTestWebSocket(t, ctx, websocketURL, ownerToken)
+	defer owner.Close(websocket.StatusNormalClosure, "test complete")
+	member := dialTestWebSocket(t, ctx, websocketURL, memberToken)
+	defer member.Close(websocket.StatusNormalClosure, "test complete")
+
+	if err := wsjson.Write(ctx, owner, ClientEvent{Type: "create_room", RequestID: "create", RoomName: "private_room", Password: "roompass"}); err != nil {
+		t.Fatalf("create room write: %v", err)
+	}
+	readUntilEvent(t, ctx, owner, "room_joined")
+	if err := wsjson.Write(ctx, member, ClientEvent{Type: "join_room", RequestID: "join", RoomName: "private_room", Password: "roompass"}); err != nil {
+		t.Fatalf("join room write: %v", err)
+	}
+	readUntilEvent(t, ctx, member, "room_joined")
+
+	for _, entry := range []struct {
+		conn    *websocket.Conn
+		content string
+	}{
+		{owner, "owner message"},
+		{member, "member message"},
+	} {
+		if err := wsjson.Write(ctx, entry.conn, ClientEvent{Type: "send_message", Content: entry.content}); err != nil {
+			t.Fatalf("send message write: %v", err)
+		}
+		readUntilEvent(t, ctx, owner, "new_message")
+		readUntilEvent(t, ctx, member, "new_message")
+	}
+
+	if err := wsjson.Write(ctx, member, ClientEvent{Type: "panic_room", RequestID: "panic"}); err != nil {
+		t.Fatalf("panic write: %v", err)
+	}
+	for _, conn := range []*websocket.Conn{owner, member} {
+		event := readUntilEvent(t, ctx, conn, "messages_purged")
+		if event.Username != "bob" {
+			t.Fatalf("messages_purged username = %q, want bob", event.Username)
+		}
+	}
+
+	messageRepository.mu.Lock()
+	defer messageRepository.mu.Unlock()
+	if len(messageRepository.messages) != 1 || messageRepository.messages[0].UserID != "owner-1" {
+		t.Fatalf("persisted messages after member panic = %#v", messageRepository.messages)
+	}
+}
+
+func TestChatHandlerOwnerPanicDeletesTheRoom(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	hasher := security.NewPasswordHasher(security.Argon2Params{Memory: 8 * 1024, Iterations: 1, Parallelism: 1, SaltLength: 16, KeyLength: 32})
+	roomRepository := newWSRoomRepository()
+	chat := NewChatHandler(app.NewRoomService(roomRepository, hasher), app.NewMessageService(&wsMessageRepository{}))
+	tokens := security.NewTokenManager([]byte("01234567890123456789012345678901"), time.Hour)
+	router := chi.NewRouter()
+	router.With(TokenMiddleware(tokens)).Get("/v1/ws", chat.ServeHTTP)
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	token, _ := tokens.Issue("owner-1", "alice", time.Now().UTC())
+	owner := dialTestWebSocket(t, ctx, "ws"+strings.TrimPrefix(server.URL, "http")+"/v1/ws", token)
+	defer owner.Close(websocket.StatusNormalClosure, "test complete")
+	if err := wsjson.Write(ctx, owner, ClientEvent{Type: "create_room", RoomName: "private_room", Password: "roompass"}); err != nil {
+		t.Fatalf("create room write: %v", err)
+	}
+	created := readUntilEvent(t, ctx, owner, "room_joined")
+	if created.Room == nil {
+		t.Fatal("missing created room")
+	}
+	if err := wsjson.Write(ctx, owner, ClientEvent{Type: "panic_room"}); err != nil {
+		t.Fatalf("panic write: %v", err)
+	}
+	readUntilEvent(t, ctx, owner, "room_deleted")
+	if _, err := roomRepository.RoomByID(ctx, created.Room.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("room still exists after owner panic: %v", err)
 	}
 }
 

@@ -19,6 +19,7 @@ func TestParseInputCommands(t *testing.T) {
 		{input: "/who", kind: CommandWho},
 		{input: "/roompasswd new-pass", kind: CommandChangeRoomPassword, args: []string{"new-pass"}},
 		{input: "/deleteroom", kind: CommandDeleteRoom},
+		{input: "/panic", kind: CommandPanicRoom},
 		{input: "/theme", kind: CommandTheme},
 		{input: "/theme green-crt", kind: CommandTheme, args: []string{"green-crt"}},
 		{input: "/q", kind: CommandQuit},

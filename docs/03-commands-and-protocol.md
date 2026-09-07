@@ -36,6 +36,7 @@ flowchart TD
 | `/who` | Room | Shows users currently connected to the room through WebSocket |
 | `/roompasswd <new-password>` | Room owner | Changes the room password |
 | `/deleteroom` | Room owner | Deletes the room and its messages after explicit confirmation |
+| `/panic` | Room | Deletes the caller's messages; when invoked by the owner, deletes and closes the room instead |
 | `/deleteaccount confirm` | Anywhere | Irreversibly deletes the account, its persistent messages, and rooms it owns, then closes the active connection |
 | `/theme [theme-name]` | Home or room | Opens the picker with no argument (`Tab`/`Shift+Tab`, `Enter`, `Esc`) or changes directly by name; supported themes are `amber-crt`, `green-crt`, `ice-blue`, `synthwave`, and `cyberpunk` |
 | `/q` | Anywhere | Closes the client |
@@ -91,7 +92,7 @@ Client events must be valid JSON in a UTF-8 WebSocket text frame no larger than 
 }
 ```
 
-Other room events are `leave_room`, `create_room`, `change_room_password`, `delete_room`, and `load_history`.
+Other room events are `leave_room`, `create_room`, `change_room_password`, `delete_room`, `panic_room`, and `load_history`. `panic_room` deletes the caller's persisted messages in the active room and emits `messages_purged`; for the room owner it deletes the room (and cascaded messages) and emits `room_deleted`.
 
 `load_history` works only for the room the client has currently joined. `before_message_id` is the oldest message already displayed; the server returns up to 50 older messages in chronological order.
 

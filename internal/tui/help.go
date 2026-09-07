@@ -35,6 +35,7 @@ var helpSections = []helpSection{
 		{usage: "/accept | /decline", description: "Respond to a received direct invite"},
 		{usage: "/who", description: "Show users in the room"},
 		{usage: "/l", description: "Leave the current room"},
+		{usage: "/panic", description: "Remove your messages; owners delete the room"},
 	}},
 	{title: "OWNER", commands: []helpCommand{
 		{usage: "/roompasswd <password>", description: "Change the room password"},

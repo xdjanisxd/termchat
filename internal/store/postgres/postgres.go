@@ -192,6 +192,14 @@ func (s *Store) DeleteExpiredMessages(ctx context.Context, now time.Time) (int64
 	return result.RowsAffected(), nil
 }
 
+func (s *Store) DeleteMessagesByUserInRoom(ctx context.Context, roomID, userID string) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM messages WHERE room_id = $1 AND user_id = $2`, roomID, userID)
+	if err != nil {
+		return mapError(err, "delete user messages in room")
+	}
+	return nil
+}
+
 func mapError(err error, operation string) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {

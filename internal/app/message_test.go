@@ -43,6 +43,17 @@ func (r *fakeMessageRepository) MessagesBefore(_ context.Context, roomID, before
 	return append([]domain.Message(nil), found[start:end]...), nil
 }
 
+func (r *fakeMessageRepository) DeleteMessagesByUserInRoom(_ context.Context, roomID, userID string) error {
+	kept := r.messages[:0]
+	for _, message := range r.messages {
+		if message.RoomID != roomID || message.UserID != userID {
+			kept = append(kept, message)
+		}
+	}
+	r.messages = kept
+	return nil
+}
+
 func TestMessageServiceHistoryBeforeReturnsAnOrderedPageAndHasMore(t *testing.T) {
 	t.Parallel()
 
@@ -82,7 +93,7 @@ func TestMessageServicePersistsMessageWithRetention(t *testing.T) {
 	if len(repo.messages) != 1 || repo.messages[0].ID != message.ID {
 		t.Fatalf("Send() did not persist message: %#v", repo.messages)
 	}
-	if message.Username != "alice" || !message.ExpiresAt.Equal(now.Add(7*24*time.Hour)) {
+	if message.Username != "alice" || !message.ExpiresAt.Equal(now.Add(30*time.Minute)) {
 		t.Fatalf("Send() message = %#v", message)
 	}
 }

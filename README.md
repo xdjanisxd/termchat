@@ -113,6 +113,7 @@ When the client opens, register a new user or sign in with an existing account. 
 | `/accept` / `/decline` | Responds to a received direct-chat invitation |
 | `/who` | Shows users currently online in the room |
 | `/l` | Leaves the room |
+| `/panic` | Deletes your room messages; an owner invocation deletes the room and all its messages |
 | `/help` | Opens the scrollable command reference; press `Esc` to close it |
 | `/theme [theme-name]` | Opens the theme picker (`Tab`/`Shift+Tab` to navigate, `Enter` to apply, `Esc` to cancel) or changes the theme directly; available: `amber-crt`, `green-crt`, `ice-blue`, `synthwave`, `cyberpunk` |
 | `/q` | Closes the application |

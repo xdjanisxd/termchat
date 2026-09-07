@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestNewMessageExpiresAfterSevenDays(t *testing.T) {
+func TestNewMessageExpiresAfterThirtyMinutes(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, time.August, 26, 15, 0, 0, 0, time.UTC)
@@ -17,7 +17,7 @@ func TestNewMessageExpiresAfterSevenDays(t *testing.T) {
 	if message.ID == "" {
 		t.Fatal("NewMessage() returned an empty ID")
 	}
-	if got, want := message.ExpiresAt, now.Add(7*24*time.Hour); !got.Equal(want) {
+	if got, want := message.ExpiresAt, now.Add(30*time.Minute); !got.Equal(want) {
 		t.Fatalf("ExpiresAt = %v, want %v", got, want)
 	}
 	if message.CreatedAt != now || message.RoomID != "room-1" || message.UserID != "user-1" || message.Content != "hello" {

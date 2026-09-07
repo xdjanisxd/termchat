@@ -21,6 +21,7 @@ var ErrRateLimited = errors.New("message rate limit exceeded")
 type MessageRepository interface {
 	SaveMessage(ctx context.Context, message domain.Message) error
 	MessagesBefore(ctx context.Context, roomID, beforeMessageID string, limit int) ([]domain.Message, error)
+	DeleteMessagesByUserInRoom(ctx context.Context, roomID, userID string) error
 }
 
 type MessagePage struct {
@@ -79,6 +80,10 @@ func (s *MessageService) HistoryBefore(ctx context.Context, roomID, beforeMessag
 		page.Messages = page.Messages[1:]
 	}
 	return page, nil
+}
+
+func (s *MessageService) DeleteOwnMessages(ctx context.Context, roomID, userID string) error {
+	return s.messages.DeleteMessagesByUserInRoom(ctx, roomID, userID)
 }
 
 func (s *MessageService) allow(userID string, now time.Time) bool {
