@@ -515,6 +515,8 @@ func (m *Model) dispatchCommand(command Command) (tea.Model, tea.Cmd) {
 		})
 	case CommandDeleteRoom:
 		return m, m.sendEventCmd(protocol.ClientEvent{Type: "delete_room", RequestID: uuid.NewString()})
+	case CommandPanicRoom:
+		return m, m.sendEventCmd(protocol.ClientEvent{Type: "panic_room", RequestID: uuid.NewString()})
 	case CommandDeleteAccount:
 		if len(command.Args) != 1 || command.Args[0] != "confirm" {
 			m.setStatus(statusWarning, "This permanently deletes your account, owned rooms, and your messages. Type /deleteaccount confirm to continue.")
@@ -626,6 +628,9 @@ func (m *Model) applyServerEvent(event protocol.ServerEvent) {
 		m.historyLoading = false
 		m.historyHasMore = event.HasMore
 		m.prependHistory(event.Messages)
+	case "messages_purged":
+		m.removeMessagesByUsername(event.Username)
+		m.setStatus(statusWarning, "Messages from "+event.Username+" were removed.")
 	case "room_left":
 		m.room = nil
 		m.rejoinRoom = roomRejoin{}
@@ -708,6 +713,16 @@ func (m *Model) prependHistory(messages []domain.Message) {
 	if len(older) > 0 {
 		m.pendingHistoryOffset = lipgloss.Height(m.renderMessages()) - oldHeight
 	}
+}
+
+func (m *Model) removeMessagesByUsername(username string) {
+	kept := m.messages[:0]
+	for _, message := range m.messages {
+		if message.Username != username {
+			kept = append(kept, message)
+		}
+	}
+	m.messages = kept
 }
 
 func (m *Model) openAuthentication(screen Screen) {

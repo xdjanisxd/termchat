@@ -273,6 +273,30 @@ func (h *ChatHandler) handle(client *chatClient, event ClientEvent) {
 			return
 		}
 		h.hub.deleteRoom(roomID)
+	case "panic_room":
+		roomID := client.room()
+		if roomID == "" {
+			client.write(namedError(event.RequestID, "NOT_IN_ROOM", "Join a room first."))
+			return
+		}
+		isOwner, err := h.rooms.IsOwner(ctx, client.identity.UserID, roomID)
+		if err != nil {
+			client.write(eventError(event.RequestID, err))
+			return
+		}
+		if isOwner {
+			if err := h.rooms.Delete(ctx, client.identity.UserID, roomID); err != nil {
+				client.write(eventError(event.RequestID, err))
+				return
+			}
+			h.hub.deleteRoom(roomID)
+			return
+		}
+		if err := h.messages.DeleteOwnMessages(ctx, roomID, client.identity.UserID); err != nil {
+			client.write(eventError(event.RequestID, err))
+			return
+		}
+		h.hub.broadcast(roomID, ServerEvent{Type: "messages_purged", Username: client.identity.Username})
 	case "ping":
 		client.write(ServerEvent{Type: "pong", RequestID: event.RequestID})
 	default:

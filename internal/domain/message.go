@@ -10,7 +10,7 @@ import (
 
 const (
 	MaxMessageLength = 2000
-	MessageRetention = 7 * 24 * time.Hour
+	MessageRetention = 30 * time.Minute
 )
 
 var ErrInvalidMessage = errors.New("message must contain 1-2000 characters")

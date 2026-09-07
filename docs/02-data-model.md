@@ -76,6 +76,6 @@ messages(expires_at)
 
 ## Retention policy
 
-Room messages are not retained indefinitely. Each message is stored for **one week (7 days)** after creation. `expires_at` is set to `created_at + 7 days`, and the server periodically and permanently deletes records where `expires_at <= now()`. The duration is fixed for every room; room-specific retention is outside the product scope.
+Room messages are not retained indefinitely. Each message is stored for **30 minutes** after creation. `expires_at` is set to `created_at + 30 minutes`, and the server periodically and permanently deletes records where `expires_at <= now()`. The duration is fixed for every room; room-specific retention is outside the product scope.
 
 Direct messages are not stored in PostgreSQL and have no history. They exist only in the memory of an active direct session and disappear when either participant leaves or disconnects, or when the server restarts.

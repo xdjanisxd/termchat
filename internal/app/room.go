@@ -91,3 +91,11 @@ func (s *RoomService) ChangePassword(ctx context.Context, ownerID, roomID, passw
 func (s *RoomService) Delete(ctx context.Context, ownerID, roomID string) error {
 	return s.rooms.DeleteRoom(ctx, roomID, ownerID)
 }
+
+func (s *RoomService) IsOwner(ctx context.Context, userID, roomID string) (bool, error) {
+	room, err := s.rooms.RoomByID(ctx, roomID)
+	if err != nil {
+		return false, err
+	}
+	return room.CreatedBy == userID, nil
+}
